@@ -1,9 +1,41 @@
+import { useEffect } from 'react'
 import MediaLibrary from './components/MediaLibrary'
 import ExportControls from './components/ExportControls'
 import Timeline from './components/Timeline'
 import VideoPlayer from './components/VideoPlayer'
+import { useStore } from './store/useStore'
 
 function App() {
+  const isPlaying = useStore((state) => state.isPlaying)
+  const setPlaying = useStore((state) => state.setPlaying)
+  const selectedClipId = useStore((state) => state.selectedClipId)
+  const removeFromTimeline = useStore((state) => state.removeFromTimeline)
+  
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+      
+      // Space = play/pause
+      if (e.code === 'Space') {
+        e.preventDefault()
+        setPlaying(!isPlaying)
+      }
+      
+      // Delete/Backspace = remove selected clip from timeline
+      if ((e.code === 'Delete' || e.code === 'Backspace') && selectedClipId) {
+        e.preventDefault()
+        removeFromTimeline(selectedClipId)
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyPress)
+    return () => window.removeEventListener('keydown', handleKeyPress)
+  }, [isPlaying, selectedClipId, setPlaying, removeFromTimeline])
+  
   return (
     <div className="h-screen bg-gray-900 text-white flex flex-col">
       {/* Header */}
@@ -12,8 +44,14 @@ function App() {
           <h1 className="text-xl font-bold">ClipForge</h1>
           <p className="text-xs text-gray-400">Video Editor MVP</p>
         </div>
-        <div className="text-sm text-gray-400">
-          PR #7: Export Pipeline ✓
+        <div className="flex items-center gap-4">
+          <div className="text-xs text-gray-500">
+            <span className="font-mono bg-gray-700 px-2 py-1 rounded">Space</span> Play/Pause • 
+            <span className="font-mono bg-gray-700 px-2 py-1 rounded ml-2">Del</span> Remove
+          </div>
+          <div className="text-sm text-gray-400">
+            PR #9: UI Polish ✓
+          </div>
         </div>
       </header>
 

@@ -37,7 +37,7 @@ export async function openFileDialog(): Promise<FileImportResult> {
     if (!SUPPORTED_FORMATS.includes(ext)) {
       return {
         success: false,
-        error: `Unsupported file format: ${ext}. Supported formats: ${SUPPORTED_FORMATS.join(', ')}`,
+        error: `Unsupported video format '${ext}'. Please select MP4, MOV, AVI, MKV, or WEBM files.`,
       }
     }
 
@@ -59,7 +59,7 @@ export function validateVideoFile(filePath: string): {
   if (!SUPPORTED_FORMATS.includes(ext)) {
     return {
       valid: false,
-      error: `Unsupported file format: ${ext}`,
+      error: `This file format '${ext}' is not supported. Please use MP4, MOV, AVI, MKV, or WEBM files.`,
     }
   }
 

@@ -30,6 +30,7 @@ export default function Timeline() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerSize, setContainerSize] = useState({ width: 800, height: 200 })
   const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const [hoveredClipId, setHoveredClipId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
   // Responsive canvas sizing
@@ -233,7 +234,7 @@ export default function Timeline() {
                     y={0}
                     width={clipWidth}
                     height={TIMELINE_HEIGHT}
-                    fill={isSelected ? '#3b82f6' : '#4a90e2'}
+                    fill={isSelected ? '#3b82f6' : (hoveredClipId === clip.id ? '#5A9FE2' : '#4a90e2')}
                     stroke={isSelected ? '#60a5fa' : '#10b981'}
                     strokeWidth={isSelected ? 3 : 2}
                     cornerRadius={4}
@@ -241,6 +242,8 @@ export default function Timeline() {
                     shadowColor={isSelected ? '#3b82f6' : '#000000'}
                     shadowOpacity={0.5}
                     onClick={() => handleClipClick(clip.id)}
+                    onMouseEnter={() => setHoveredClipId(clip.id)}
+                    onMouseLeave={() => setHoveredClipId(null)}
                   />
 
                   {/* Trimmed-out region (right) - darkened */}
