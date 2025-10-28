@@ -163,53 +163,56 @@ git pull origin main
 ## Progress Tracking
 
 ### Day 1 Progress (Monday, Oct 27):
-- [ ] PR #1: Project Setup & Configuration ✅
-  - [ ] Initialize with pnpm
-  - [ ] Configure TypeScript, Vite, TailwindCSS
-  - [ ] Set up testing framework
-  - [ ] App launches in dev mode
-- [ ] PR #2: File Import System & Media Library ✅
-  - [ ] File picker implementation
-  - [ ] Drag-and-drop support
-  - [ ] MediaLibrary component
-  - [ ] Thumbnail generation
-- [ ] PR #3: FFmpeg Integration & Export Testing ✅
-  - [ ] FFmpeg handler setup
-  - [ ] Metadata extraction (JSON)
-  - [ ] Basic export functionality
-  - [ ] Progress tracking
+- [x] PR #1: Project Setup & Configuration ✅
+  - [x] Initialize with pnpm
+  - [x] Configure TypeScript, Vite, TailwindCSS
+  - [x] Set up testing framework
+  - [x] App launches in dev mode
+  - [x] Bytecode compilation for production builds
+- [x] PR #2: File Import System & Media Library ✅
+  - [x] File picker implementation
+  - [x] Drag-and-drop support
+  - [x] MediaLibrary component
+  - [x] Thumbnail generation
+- [x] PR #3: FFmpeg Integration & Export Testing ✅
+  - [x] FFmpeg handler setup (Apple Silicon compatible)
+  - [x] Metadata extraction (JSON)
+  - [x] Basic export functionality
+  - [x] Progress tracking
 
-**Day 1 Goal:** Foundation complete, ready for Day 2 MVP features
+**Day 1 Goal:** ✅ Foundation complete, ready for Day 2 MVP features
 
 ---
 
 ### Day 2 Progress (Tuesday, Oct 28 - MVP Deadline):
-- [ ] PR #4: Timeline UI with React-Konva ✅
-  - [ ] Canvas timeline component
-  - [ ] Drag-and-drop clips onto timeline
-  - [ ] Clip positioning and width calculations
-  - [ ] Playhead visualization
-- [ ] PR #5: Video Player & Playback Controls ✅
+- [x] PR #4: Timeline UI with React-Konva ✅
+  - [x] Canvas timeline component
+  - [x] Drag-and-drop clips onto timeline
+  - [x] Clip positioning and width calculations
+  - [x] Playhead visualization
+  - [x] NaN-safe calculations
+  - [x] Toast notifications for user feedback
+- [ ] PR #5: Video Player & Playback Controls 🚧
   - [ ] VideoController class
   - [ ] Play/pause functionality
   - [ ] Sync with timeline playhead
   - [ ] Time display
-- [ ] PR #6: Trim Functionality ✅
+- [ ] PR #6: Trim Functionality
   - [ ] Drag handles on clips
   - [ ] Set In/Out buttons
   - [ ] Visual trim indicators
   - [ ] Trim validation
-- [ ] PR #7: Export Pipeline with Progress ✅
+- [ ] PR #7: Export Pipeline with Progress
   - [ ] Single-clip export
   - [ ] Multiple-clip concatenation
   - [ ] Progress bar with percentage
   - [ ] Temp file cleanup
-- [ ] PR #8: App Packaging & MVP Testing ✅
+- [ ] PR #8: App Packaging & MVP Testing
   - [ ] electron-builder configuration
   - [ ] DMG/EXE creation
   - [ ] All MVP validation tests pass
   - [ ] Packaged app tested
-- [ ] **MVP SUBMITTED** ✅ (Tuesday 10:59 PM CT)
+- [ ] **MVP SUBMITTED** (Tuesday 10:59 PM CT)
 
 **Day 2 Goal:** Fully functional MVP submitted on time
 
@@ -459,10 +462,19 @@ If you're behind schedule and need to submit SOMETHING by the MVP deadline, impl
 ### Daily Check-ins:
 
 **End of Day 1:**
-- [ ] Can I launch the app in dev mode?
-- [ ] Can I import a video file?
-- [ ] Does FFmpeg extract metadata correctly?
-- [ ] Am I on track for Day 2?
+- [x] Can I launch the app in dev mode? ✅
+- [x] Can I import a video file? ✅
+- [x] Does FFmpeg extract metadata correctly? ✅
+- [x] Am I on track for Day 2? ✅
+
+**Current Status (Day 2 - Tuesday Evening):**
+- [x] Timeline UI complete with drag-and-drop ✅
+- [x] Clips can be added to timeline ✅
+- [x] Visual playhead and time markers ✅
+- [ ] Video player integration (next)
+- [ ] Trim functionality (after player)
+- [ ] Multi-clip export (after trim)
+- [ ] Packaging (final step)
 
 **End of Day 2:**
 - [ ] Does the packaged app work?

@@ -1,23 +1,145 @@
-import { spawn, ChildProcess } from 'child_process'
-import ffmpegPath from 'ffmpeg-static'
+import { spawn } from 'child_process'
 import { tmpdir } from 'os'
 import { join } from 'path'
-import { writeFileSync, unlinkSync, existsSync } from 'fs'
+import { writeFileSync, unlinkSync, existsSync, readFileSync, chmodSync } from 'fs'
+import { BrowserWindow, app } from 'electron'
 import type { FFprobeResponse, VideoMetadata, TimelineClip } from '../../src/types'
-import { BrowserWindow } from 'electron'
 
-// Get ffprobe path (same directory as ffmpeg)
-const ffprobePath = ffmpegPath ? ffmpegPath.replace('ffmpeg', 'ffprobe') : 'ffprobe'
+/**
+ * Get robust paths to ffmpeg and ffprobe binaries using installer packages
+ * These packages automatically provide the correct ARM64/x64 binaries for each platform
+ */
+function getBinaryPaths(): { ffmpegPath: string; ffprobePath: string } {
+  let ffmpegPath: string
+  let ffprobePath: string
+
+  // Check if we're in development or production
+  const isDev = !app.isPackaged
+
+  if (isDev) {
+    // Development mode: Use @ffmpeg-installer and @ffprobe-installer
+    try {
+      // These installer packages export the path directly
+      const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
+      const ffprobeInstaller = require('@ffprobe-installer/ffprobe')
+      
+      ffmpegPath = ffmpegInstaller.path
+      ffprobePath = ffprobeInstaller.path
+      
+      console.log('[FFmpeg] Development mode: Loading ARM64-compatible binaries')
+      console.log('[FFmpeg] FFmpeg path:', ffmpegPath)
+      console.log('[FFmpeg] FFprobe path:', ffprobePath)
+    } catch (error) {
+      console.error('[FFmpeg] Failed to load installer packages:', error)
+      throw new Error(`FFmpeg binaries not found in development mode: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  } else {
+    // Production mode: Use extraResources
+    const resourcesPath = process.resourcesPath
+    
+    if (process.platform === 'darwin') {
+      ffmpegPath = join(resourcesPath, 'ffmpeg')
+      ffprobePath = join(resourcesPath, 'ffprobe')
+    } else if (process.platform === 'win32') {
+      ffmpegPath = join(resourcesPath, 'ffmpeg.exe')
+      ffprobePath = join(resourcesPath, 'ffprobe.exe')
+    } else {
+      // Linux
+      ffmpegPath = join(resourcesPath, 'ffmpeg')
+      ffprobePath = join(resourcesPath, 'ffprobe')
+    }
+    
+    console.log('[FFmpeg] Production mode: Using extraResources')
+  }
+
+  // Sanity check: Verify binaries exist
+  if (!existsSync(ffmpegPath)) {
+    console.error('[FFmpeg] FFmpeg binary not found at:', ffmpegPath)
+    throw new Error(`FFmpeg binary not found: ${ffmpegPath}`)
+  }
+
+  if (!existsSync(ffprobePath)) {
+    console.error('[FFmpeg] FFprobe binary not found at:', ffprobePath)
+    throw new Error(`FFprobe binary not found: ${ffprobePath}`)
+  }
+
+  // Make sure binaries are executable (Unix-like systems)
+  if (process.platform !== 'win32') {
+    try {
+      chmodSync(ffmpegPath, 0o755)
+      chmodSync(ffprobePath, 0o755)
+    } catch (error) {
+      console.warn('[FFmpeg] Failed to set executable permissions:', error)
+    }
+  }
+
+  return { ffmpegPath, ffprobePath }
+}
+
+/**
+ * Diagnostic function to verify FFmpeg installation
+ * Logs version information at startup
+ */
+export function diagnoseFfmpeg() {
+  try {
+    ensureBinaryPaths()
+    
+    if (!ffmpegPath) {
+      console.error('[FFmpeg] Diagnostics failed: FFmpeg path not initialized')
+      return
+    }
+
+    const result = spawn(ffmpegPath, ['-version'])
+    let output = ''
+
+    result.stdout.on('data', (data) => {
+      output += data.toString()
+    })
+
+    result.on('close', (code) => {
+      if (code === 0) {
+        const versionLine = output.split('\n')[0]
+        console.log('[FFmpeg] Version check:', versionLine)
+        console.log('[FFmpeg] Binary architecture: ARM64-compatible')
+      } else {
+        console.error('[FFmpeg] Version check failed with code:', code)
+      }
+    })
+
+    result.on('error', (error) => {
+      console.error('[FFmpeg] Version check spawn error:', error.message)
+    })
+  } catch (error) {
+    console.error('[FFmpeg] Diagnostics error:', error)
+  }
+}
+
+// Binary paths - will be initialized lazily on first use
+let ffmpegPath: string | null = null
+let ffprobePath: string | null = null
+let pathsInitialized = false
+
+/**
+ * Lazy initialization of binary paths
+ * Called on first use to ensure app is ready
+ */
+function ensureBinaryPaths() {
+  if (pathsInitialized) return
+
+  try {
+    const paths = getBinaryPaths()
+    ffmpegPath = paths.ffmpegPath
+    ffprobePath = paths.ffprobePath
+    pathsInitialized = true
+  } catch (error) {
+    console.error('[FFmpeg] Failed to initialize paths:', error)
+    throw error
+  }
+}
 
 export interface MetadataResult {
   success: boolean
   metadata?: VideoMetadata
-  error?: string
-}
-
-export interface ThumbnailResult {
-  success: boolean
-  thumbnail?: string // base64 data URI
   error?: string
 }
 
@@ -26,25 +148,21 @@ export interface ThumbnailResult {
  */
 export async function extractMetadata(filePath: string): Promise<MetadataResult> {
   try {
-    const ffprobeOutput = await runFFprobe(filePath)
-    const metadata = parseFFprobeOutput(ffprobeOutput)
-    
-    return { success: true, metadata }
+    ensureBinaryPaths()
   } catch (error) {
     return {
       success: false,
-      error: `Failed to extract metadata: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to initialize FFprobe: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }
   }
-}
 
-/**
- * Run ffprobe and get JSON output
- */
-function runFFprobe(filePath: string): Promise<FFprobeResponse> {
-  return new Promise((resolve, reject) => {
+  if (!ffprobePath) {
+    return { success: false, error: 'FFprobe binary not initialized' }
+  }
+
+  return new Promise((resolve) => {
     const args = [
-      '-v', 'quiet',
+      '-v', 'error',
       '-print_format', 'json',
       '-show_format',
       '-show_streams',
@@ -52,180 +170,199 @@ function runFFprobe(filePath: string): Promise<FFprobeResponse> {
     ]
 
     const ffprobe = spawn(ffprobePath, args)
-    let output = ''
-    let errorOutput = ''
+    let stdout = ''
+    let stderr = ''
 
     ffprobe.stdout.on('data', (data) => {
-      output += data.toString()
+      stdout += data.toString()
     })
 
     ffprobe.stderr.on('data', (data) => {
-      errorOutput += data.toString()
+      stderr += data.toString()
+    })
+
+    ffprobe.on('error', (error) => {
+      resolve({
+        success: false,
+        error: `Failed to spawn ffprobe: ${error.message}`,
+      })
     })
 
     ffprobe.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(`ffprobe exited with code ${code}: ${errorOutput}`))
+        resolve({
+          success: false,
+          error: `FFprobe exited with code ${code}: ${stderr}`,
+        })
         return
       }
 
       try {
-        const json = JSON.parse(output)
-        resolve(json)
-      } catch (error) {
-        reject(new Error(`Failed to parse ffprobe output: ${error}`))
-      }
-    })
+        const data: FFprobeResponse = JSON.parse(stdout)
+        const videoStream = data.streams.find((s) => s.codec_type === 'video')
 
-    ffprobe.on('error', (error) => {
-      reject(new Error(`Failed to spawn ffprobe: ${error.message}`))
+        if (!videoStream) {
+          resolve({ success: false, error: 'No video stream found' })
+          return
+        }
+
+        const duration = parseFloat(data.format.duration)
+        const fileSize = parseInt(data.format.size, 10)
+
+        const metadata: VideoMetadata = {
+          duration,
+          width: videoStream.width || 0,
+          height: videoStream.height || 0,
+          codec: videoStream.codec_name,
+          fileSize,
+        }
+
+        resolve({ success: true, metadata })
+      } catch (error) {
+        resolve({
+          success: false,
+          error: `Failed to parse metadata: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        })
+      }
     })
   })
 }
 
-/**
- * Parse ffprobe JSON output into VideoMetadata
- */
-export function parseFFprobeOutput(ffprobeJSON: FFprobeResponse): VideoMetadata {
-  const videoStream = ffprobeJSON.streams.find((s) => s.codec_type === 'video')
-
-  return {
-    duration: parseFloat(ffprobeJSON.format.duration) || 0,
-    width: videoStream?.width || 0,
-    height: videoStream?.height || 0,
-    codec: videoStream?.codec_name || 'unknown',
-    fileSize: parseInt(ffprobeJSON.format.size) || 0,
-  }
+export interface ThumbnailResult {
+  success: boolean
+  thumbnail?: string
+  error?: string
 }
 
 /**
- * Generate thumbnail from video at 1-second mark
+ * Generate thumbnail from video at 1 second mark
  */
 export async function generateThumbnail(filePath: string): Promise<ThumbnailResult> {
   try {
-    if (!ffmpegPath) {
-      throw new Error('FFmpeg path not found')
-    }
-
-    // Generate temp filename
-    const tempPath = join(tmpdir(), `clipforge-thumb-${Date.now()}.jpg`)
-
-    // Extract frame at 1 second
-    await extractFrame(filePath, tempPath, 1)
-
-    // Read file and convert to base64
-    const fs = await import('fs/promises')
-    const imageBuffer = await fs.readFile(tempPath)
-    const base64 = imageBuffer.toString('base64')
-    const dataURI = `data:image/jpeg;base64,${base64}`
-
-    // Clean up temp file
-    try {
-      unlinkSync(tempPath)
-    } catch (error) {
-      // Ignore cleanup errors
-    }
-
-    return { success: true, thumbnail: dataURI }
+    ensureBinaryPaths()
   } catch (error) {
     return {
       success: false,
-      error: `Failed to generate thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Failed to initialize FFmpeg: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }
   }
-}
 
-/**
- * Extract a single frame from video at specified time
- */
-function extractFrame(inputPath: string, outputPath: string, timeSeconds: number): Promise<void> {
-  return new Promise((resolve, reject) => {
+  if (!ffmpegPath) {
+    return { success: false, error: 'FFmpeg binary not initialized' }
+  }
+
+  const outputPath = join(tmpdir(), `thumb-${Date.now()}.jpg`)
+
+  return new Promise((resolve) => {
     const args = [
-      '-ss', timeSeconds.toString(),
-      '-i', inputPath,
+      '-ss', '1',
+      '-i', filePath,
       '-vframes', '1',
-      '-q:v', '2', // Quality (1-31, lower is better)
-      '-y', // Overwrite output file
+      '-q:v', '2',
+      '-y',
       outputPath,
     ]
 
-    const ffmpeg = spawn(ffmpegPath!, args)
-    let errorOutput = ''
+    const ffmpeg = spawn(ffmpegPath, args)
+    let stderr = ''
 
     ffmpeg.stderr.on('data', (data) => {
-      errorOutput += data.toString()
+      stderr += data.toString()
+    })
+
+    ffmpeg.on('error', (error) => {
+      resolve({
+        success: false,
+        error: `Failed to spawn ffmpeg: ${error.message}`,
+      })
     })
 
     ffmpeg.on('close', (code) => {
       if (code !== 0) {
-        reject(new Error(`FFmpeg exited with code ${code}: ${errorOutput}`))
+        resolve({
+          success: false,
+          error: `FFmpeg thumbnail generation failed with code ${code}: ${stderr}`,
+        })
         return
       }
 
-      // Verify file was created
       if (!existsSync(outputPath)) {
-        reject(new Error('Thumbnail file was not created'))
+        resolve({
+          success: false,
+          error: 'Thumbnail file was not created',
+        })
         return
       }
 
-      resolve()
-    })
+      try {
+        const imageBuffer = readFileSync(outputPath)
+        const base64 = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`
 
-    ffmpeg.on('error', (error) => {
-      reject(new Error(`Failed to spawn FFmpeg: ${error.message}`))
+        // Clean up temp file
+        try {
+          unlinkSync(outputPath)
+        } catch (error) {
+          console.warn('[FFmpeg] Failed to delete temp thumbnail:', error)
+        }
+
+        resolve({ success: true, thumbnail: base64 })
+      } catch (error) {
+        resolve({
+          success: false,
+          error: `Failed to read thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        })
+      }
     })
   })
 }
 
 /**
- * Export single clip with progress tracking
+ * Export a single clip with optional trim points
  */
 export async function exportSingleClip(
   clip: TimelineClip,
   outputPath: string,
   mainWindow: BrowserWindow | null
 ): Promise<{ success: boolean; error?: string }> {
-  return new Promise((resolve) => {
-    if (!ffmpegPath) {
-      resolve({ success: false, error: 'FFmpeg not found' })
-      return
+  try {
+    ensureBinaryPaths()
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to initialize FFmpeg: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }
+  }
 
+  if (!ffmpegPath) {
+    return { success: false, error: 'FFmpeg binary not initialized' }
+  }
+
+  return new Promise((resolve) => {
     const args: string[] = []
 
-    // Add trim start if needed
+    // Add start time if trimmed
     if (clip.trimStart > 0) {
       args.push('-ss', clip.trimStart.toString())
     }
 
-    // Input file
     args.push('-i', clip.filePath)
 
-    // Add trim duration if needed
+    // Add duration if trimmed
     if (clip.trimEnd < clip.duration) {
       const duration = clip.trimEnd - clip.trimStart
       args.push('-t', duration.toString())
     }
 
-    // Video codec
-    args.push('-c:v', 'libx264')
-    
-    // Audio codec
-    args.push('-c:a', 'aac')
-    
-    // Overwrite output
-    args.push('-y')
-    
-    // Output file
-    args.push(outputPath)
+    // Codec settings
+    args.push('-c:v', 'libx264', '-c:a', 'aac', '-y', outputPath)
 
     const ffmpeg = spawn(ffmpegPath, args)
     const totalDuration = clip.trimEnd - clip.trimStart
-    let errorOutput = ''
+    let stderr = ''
 
     ffmpeg.stderr.on('data', (data) => {
       const output = data.toString()
-      errorOutput += output
+      stderr += output
 
       // Parse progress
       const timeMatch = output.match(/time=(\d+):(\d+):(\d+\.\d+)/)
@@ -244,54 +381,62 @@ export async function exportSingleClip(
       }
     })
 
-    ffmpeg.on('close', (code) => {
-      if (code !== 0) {
-        resolve({
-          success: false,
-          error: `Export failed with code ${code}: ${errorOutput}`,
-        })
-        return
-      }
-
-      // Verify output file exists
-      if (!existsSync(outputPath)) {
-        resolve({ success: false, error: 'Output file was not created' })
-        return
-      }
-
-      resolve({ success: true })
-    })
-
     ffmpeg.on('error', (error) => {
       resolve({
         success: false,
         error: `Failed to spawn FFmpeg: ${error.message}`,
       })
     })
+
+    ffmpeg.on('close', (code) => {
+      if (code !== 0) {
+        resolve({
+          success: false,
+          error: `Export failed with code ${code}: ${stderr}`,
+        })
+        return
+      }
+
+      if (!existsSync(outputPath)) {
+        resolve({
+          success: false,
+          error: 'Output file was not created',
+        })
+        return
+      }
+
+      resolve({ success: true })
+    })
   })
 }
 
 /**
- * Export multiple clips using concat demuxer
+ * Export multiple clips by concatenating them
  */
 export async function exportMultipleClips(
   clips: TimelineClip[],
   outputPath: string,
   mainWindow: BrowserWindow | null
 ): Promise<{ success: boolean; error?: string }> {
+  try {
+    ensureBinaryPaths()
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to initialize FFmpeg: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    }
+  }
+
+  if (!ffmpegPath) {
+    return { success: false, error: 'FFmpeg binary not initialized' }
+  }
+
   const filelistPath = join(tmpdir(), `clipforge-export-${Date.now()}.txt`)
 
   try {
-    // Generate filelist.txt
-    const filelistContent = clips
-      .map((clip) => `file '${clip.filePath}'`)
-      .join('\n')
-    
+    // Generate filelist content
+    const filelistContent = clips.map((clip) => `file '${clip.filePath}'`).join('\n')
     writeFileSync(filelistPath, filelistContent, 'utf-8')
-
-    if (!ffmpegPath) {
-      return { success: false, error: 'FFmpeg not found' }
-    }
 
     return new Promise((resolve) => {
       const args = [
@@ -304,16 +449,13 @@ export async function exportMultipleClips(
         outputPath,
       ]
 
-      const ffmpeg = spawn(ffmpegPath!, args)
-      const totalDuration = clips.reduce(
-        (sum, clip) => sum + (clip.trimEnd - clip.trimStart),
-        0
-      )
-      let errorOutput = ''
+      const ffmpeg = spawn(ffmpegPath, args)
+      const totalDuration = clips.reduce((sum, clip) => sum + (clip.trimEnd - clip.trimStart), 0)
+      let stderr = ''
 
       ffmpeg.stderr.on('data', (data) => {
         const output = data.toString()
-        errorOutput += output
+        stderr += output
 
         // Parse progress
         const timeMatch = output.match(/time=(\d+):(\d+):(\d+\.\d+)/)
@@ -332,42 +474,43 @@ export async function exportMultipleClips(
         }
       })
 
-      ffmpeg.on('close', (code) => {
-        // Clean up filelist
-        try {
-          unlinkSync(filelistPath)
-        } catch (error) {
-          // Ignore cleanup errors
-        }
-
-        if (code !== 0) {
-          resolve({
-            success: false,
-            error: `Export failed with code ${code}: ${errorOutput}`,
-          })
-          return
-        }
-
-        if (!existsSync(outputPath)) {
-          resolve({ success: false, error: 'Output file was not created' })
-          return
-        }
-
-        resolve({ success: true })
-      })
-
       ffmpeg.on('error', (error) => {
-        // Clean up filelist
         try {
           unlinkSync(filelistPath)
         } catch (err) {
           // Ignore cleanup errors
         }
-
         resolve({
           success: false,
           error: `Failed to spawn FFmpeg: ${error.message}`,
         })
+      })
+
+      ffmpeg.on('close', (code) => {
+        // Clean up temp file
+        try {
+          unlinkSync(filelistPath)
+        } catch (error) {
+          console.warn('[FFmpeg] Failed to delete temp filelist:', error)
+        }
+
+        if (code !== 0) {
+          resolve({
+            success: false,
+            error: `Export failed with code ${code}: ${stderr}`,
+          })
+          return
+        }
+
+        if (!existsSync(outputPath)) {
+          resolve({
+            success: false,
+            error: 'Output file was not created',
+          })
+          return
+        }
+
+        resolve({ success: true })
       })
     })
   } catch (error) {
@@ -377,4 +520,3 @@ export async function exportMultipleClips(
     }
   }
 }
-

@@ -1,6 +1,49 @@
 import { create } from 'zustand'
 import type { Clip, TimelineClip, ExportProgress } from '../types'
 
+/**
+ * Helper: Safely coerce numeric clip fields to valid numbers
+ * Accepts any object with optional duration, trimStart, trimEnd
+ * Handles both numbers and string representations of numbers
+ */
+function sanitizeClipNumbers(incoming: { 
+  duration?: number | string
+  trimStart?: number | string
+  trimEnd?: number | string
+  [key: string]: any
+}): {
+  trimStart: number
+  trimEnd: number
+  duration: number
+} {
+  // Convert to number first, then check if finite (handles string "1.23" → 1.23)
+  const parsedDuration = Number(incoming?.duration)
+  const parsedTrimStart = Number(incoming?.trimStart)
+  const parsedTrimEnd = Number(incoming?.trimEnd)
+  
+  const safeDuration = Number.isFinite(parsedDuration) ? parsedDuration : 0
+  const safeTrimStart = Number.isFinite(parsedTrimStart) ? parsedTrimStart : 0
+  const safeTrimEnd = Number.isFinite(parsedTrimEnd) ? parsedTrimEnd : safeDuration
+  
+  return {
+    trimStart: safeTrimStart,
+    trimEnd: safeTrimEnd,
+    duration: safeDuration,
+  }
+}
+
+/**
+ * Helper: Calculate the total duration of clips (NaN-safe)
+ */
+function getTotalDuration(clips: TimelineClip[]): number {
+  return clips.reduce((total, c) => {
+    const dur = Number.isFinite(c?.trimEnd) && Number.isFinite(c?.trimStart)
+      ? Math.max(0, c.trimEnd - c.trimStart)
+      : 0
+    return total + dur
+  }, 0)
+}
+
 interface AppState {
   // Clips
   clips: Clip[]
@@ -26,7 +69,7 @@ interface AppState {
   setExportProgress: (progress: Partial<ExportProgress>) => void
 }
 
-export const useStore = create<AppState>((set) => ({
+const storeConfig = (set: any) => ({
   // Initial state
   clips: [],
   timelineClips: [],
@@ -41,63 +84,228 @@ export const useStore = create<AppState>((set) => ({
   },
   
   // Actions
-  addClip: (clip) =>
-    set((state) => ({
-      clips: [...state.clips, clip],
-    })),
-  
-  removeClip: (id) =>
-    set((state) => ({
-      clips: state.clips.filter((c) => c.id !== id),
-      timelineClips: state.timelineClips.filter((c) => c.id !== id),
-      selectedClipId: state.selectedClipId === id ? null : state.selectedClipId,
-    })),
-  
-  addToTimeline: (clip) =>
-    set((state) => {
-      // Calculate start time based on existing clips
-      const startTime = state.timelineClips.reduce(
-        (total, c) => total + (c.trimEnd - c.trimStart),
-        0
-      )
+  addClip: (clip: Clip) =>
+    set((state: any) => {
+      console.log('[Store] addClip called:', clip.filename)
       
-      const timelineClip: TimelineClip = {
-        ...clip,
-        startTime,
-        trimStart: 0,
-        trimEnd: clip.duration,
+      // Validate incoming clip
+      if (!clip.id || !clip.filename || !clip.filePath) {
+        console.error('[Store] Invalid clip: missing required fields', clip)
+        return state
       }
       
+      // Check for duplicate ID
+      if (state.clips.some((c: Clip) => c.id === clip.id)) {
+        console.warn('[Store] Clip with ID already exists in library:', clip.id)
+        return state
+      }
+      
+      // Sanitize numeric fields
+      const { duration } = sanitizeClipNumbers(clip)
+      
+      const sanitizedClip: Clip = {
+        ...clip,
+        duration,
+      }
+      
+      console.log('[Store] Clip added to library:', {
+        id: sanitizedClip.id,
+        filename: sanitizedClip.filename,
+        duration: sanitizedClip.duration,
+      })
+      
       return {
-        timelineClips: [...state.timelineClips, timelineClip],
+        clips: [...state.clips, sanitizedClip],
       }
     }),
   
-  removeFromTimeline: (id) =>
-    set((state) => ({
-      timelineClips: state.timelineClips.filter((c) => c.id !== id),
+  removeClip: (id: string) =>
+    set((state: any) => ({
+      clips: state.clips.filter((c: Clip) => c.id !== id),
+      timelineClips: state.timelineClips.filter((c: TimelineClip) => c.id !== id),
       selectedClipId: state.selectedClipId === id ? null : state.selectedClipId,
     })),
   
-  selectClip: (id) =>
+  addToTimeline: (incoming: Clip) =>
+    set((state: any) => {
+      console.log('[Store] addToTimeline called with:', incoming.filename)
+      console.log('[Store] Current timeline clips:', state.timelineClips.length)
+      
+      // Validate incoming clip has required fields
+      if (!incoming.id || !incoming.filename) {
+        console.error('[Store] Invalid clip: missing id or filename', incoming)
+        return state // No change
+      }
+      
+      // Check for duplicate ID
+      if (state.timelineClips.some((c: TimelineClip) => c.id === incoming.id)) {
+        console.warn('[Store] Clip with ID already exists on timeline:', incoming.id)
+        return state // No change
+      }
+      
+      // Sanitize numeric fields with helper function
+      const { trimStart, trimEnd, duration } = sanitizeClipNumbers(incoming)
+      
+      console.log('[Store] Coerced values:', { trimStart, trimEnd, duration })
+      
+      // Calculate start time based on total duration of existing clips
+      const startTime = getTotalDuration(state.timelineClips)
+      
+      // Validate that trim values are within bounds
+      const boundedTrimStart = Math.max(0, Math.min(trimStart, duration))
+      const boundedTrimEnd = Math.max(boundedTrimStart, Math.min(trimEnd, duration))
+      
+      if (boundedTrimStart !== trimStart || boundedTrimEnd !== trimEnd) {
+        console.warn('[Store] Trim values adjusted to bounds:', {
+          original: { trimStart, trimEnd },
+          bounded: { trimStart: boundedTrimStart, trimEnd: boundedTrimEnd }
+        })
+      }
+      
+      const timelineClip: TimelineClip = {
+        ...incoming,
+        startTime,
+        trimStart: boundedTrimStart,
+        trimEnd: boundedTrimEnd,
+        duration,
+      }
+      
+      console.log('[Store] New timeline clip created:', {
+        id: timelineClip.id,
+        filename: timelineClip.filename,
+        startTime: timelineClip.startTime,
+        trimStart: timelineClip.trimStart,
+        trimEnd: timelineClip.trimEnd,
+        duration: timelineClip.duration,
+        effectiveDuration: timelineClip.trimEnd - timelineClip.trimStart,
+      })
+      
+      const newTimelineClips = [...state.timelineClips, timelineClip]
+      console.log('[Store] New timeline clips count:', newTimelineClips.length)
+      console.log('[Store] Total timeline duration:', getTotalDuration(newTimelineClips))
+      
+      return {
+        timelineClips: newTimelineClips,
+      }
+    }),
+  
+  removeFromTimeline: (id: string) =>
+    set((state: any) => {
+      console.log('[Store] removeFromTimeline called:', id)
+      
+      const clipExists = state.timelineClips.some((c: TimelineClip) => c.id === id)
+      if (!clipExists) {
+        console.warn('[Store] Clip not found for removal:', id)
+        return state
+      }
+      
+      // Remove the clip
+      const filteredClips = state.timelineClips.filter((c: TimelineClip) => c.id !== id)
+      
+      // Recalculate startTime for all remaining clips
+      let currentStartTime = 0
+      const repositionedClips = filteredClips.map((c: TimelineClip) => {
+        const updatedClip = {
+          ...c,
+          startTime: currentStartTime,
+        }
+        const effectiveDuration = c.trimEnd - c.trimStart
+        currentStartTime += effectiveDuration
+        return updatedClip
+      })
+      
+      console.log('[Store] Timeline clips repositioned after removal')
+      console.log('[Store] Remaining clips:', repositionedClips.length)
+      
+      return {
+        timelineClips: repositionedClips,
+        selectedClipId: state.selectedClipId === id ? null : state.selectedClipId,
+      }
+    }),
+  
+  selectClip: (id: string | null) =>
     set({ selectedClipId: id }),
   
-  setPlayheadPosition: (position) =>
+  setPlayheadPosition: (position: number) =>
     set({ playheadPosition: position }),
   
-  setPlaying: (isPlaying) =>
+  setPlaying: (isPlaying: boolean) =>
     set({ isPlaying }),
   
-  updateClipTrim: (id, trimStart, trimEnd) =>
-    set((state) => ({
-      timelineClips: state.timelineClips.map((clip) =>
-        clip.id === id ? { ...clip, trimStart, trimEnd } : clip
-      ),
-    })),
+  updateClipTrim: (id: string, trimStart: number, trimEnd: number) =>
+    set((state: any) => {
+      console.log('[Store] updateClipTrim called:', { id, trimStart, trimEnd })
+      
+      const clipIndex = state.timelineClips.findIndex((c: TimelineClip) => c.id === id)
+      if (clipIndex === -1) {
+        console.warn('[Store] Clip not found for trim update:', id)
+        return state
+      }
+      
+      const clip = state.timelineClips[clipIndex]
+      
+      // Sanitize and bound trim values
+      const safeTrimStart = Number.isFinite(trimStart) ? Number(trimStart) : 0
+      const safeTrimEnd = Number.isFinite(trimEnd) ? Number(trimEnd) : clip.duration
+      
+      // Ensure trim values are within clip duration
+      const boundedTrimStart = Math.max(0, Math.min(safeTrimStart, clip.duration))
+      const boundedTrimEnd = Math.max(boundedTrimStart, Math.min(safeTrimEnd, clip.duration))
+      
+      if (boundedTrimStart === clip.trimStart && boundedTrimEnd === clip.trimEnd) {
+        console.log('[Store] No trim change detected, skipping update')
+        return state
+      }
+      
+      console.log('[Store] Trim values adjusted:', {
+        original: { trimStart, trimEnd },
+        bounded: { trimStart: boundedTrimStart, trimEnd: boundedTrimEnd }
+      })
+      
+      // Update the clip with new trim values
+      const updatedClips = [...state.timelineClips]
+      updatedClips[clipIndex] = {
+        ...clip,
+        trimStart: boundedTrimStart,
+        trimEnd: boundedTrimEnd,
+      }
+      
+      // Recalculate startTime for all subsequent clips
+      let currentStartTime = 0
+      for (let i = 0; i < updatedClips.length; i++) {
+        const c = updatedClips[i]
+        updatedClips[i] = {
+          ...c,
+          startTime: currentStartTime,
+        }
+        const effectiveDuration = c.trimEnd - c.trimStart
+        currentStartTime += effectiveDuration
+      }
+      
+      console.log('[Store] Timeline clips repositioned after trim update')
+      
+      return {
+        timelineClips: updatedClips,
+      }
+    }),
   
-  setExportProgress: (progress) =>
-    set((state) => ({
+  setExportProgress: (progress: Partial<ExportProgress>) =>
+    set((state: any) => ({
       exportProgress: { ...state.exportProgress, ...progress },
     })),
-}))
+})
+
+export const useStore = create<AppState>(storeConfig)
+
+// Runtime diagnostic - log store on creation
+if (typeof window !== 'undefined') {
+  const store = useStore.getState()
+  console.log('[Store] Initialized with actions:', Object.keys(store).filter(k => typeof store[k as keyof typeof store] === 'function'))
+  
+  if (typeof store.addToTimeline !== 'function') {
+    console.error('[Store] ❌ CRITICAL: addToTimeline is NOT a function!', typeof store.addToTimeline)
+  } else {
+    console.log('[Store] ✅ addToTimeline is correctly exported')
+  }
+}
 

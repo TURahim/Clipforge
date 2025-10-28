@@ -1,30 +1,36 @@
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig, externalizeDepsPlugin, bytecodePlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [
+      externalizeDepsPlugin(),
+      ...(mode === 'production' ? [bytecodePlugin()] : [])
+    ],
     build: {
       outDir: 'out/main',
       rollupOptions: {
         input: resolve(__dirname, 'electron/main.ts'),
         output: {
-          format: 'cjs', // Use CommonJS for Electron main process
-          entryFileNames: '[name].cjs'
+          format: 'cjs',
+          entryFileNames: mode === 'production' ? '[name].js' : '[name].cjs'
         }
       }
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [
+      externalizeDepsPlugin(),
+      ...(mode === 'production' ? [bytecodePlugin()] : [])
+    ],
     build: {
       outDir: 'out/preload',
       rollupOptions: {
         input: resolve(__dirname, 'electron/preload.ts'),
         output: {
-          format: 'cjs', // Use CommonJS for preload
-          entryFileNames: '[name].cjs'
+          format: 'cjs',
+          entryFileNames: mode === 'production' ? '[name].js' : '[name].cjs'
         }
       }
     }
@@ -32,9 +38,9 @@ export default defineConfig({
   renderer: {
     root: '.',
     server: {
-      port: 5174,
+      port: 5175,
       strictPort: false,
-      host: '127.0.0.1',
+      host: 'localhost',
     },
     build: {
       outDir: 'out/renderer',
@@ -44,5 +50,5 @@ export default defineConfig({
     },
     plugins: [react()]
   }
-})
+}))
 

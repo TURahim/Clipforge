@@ -1,5 +1,6 @@
 import MediaLibrary from './components/MediaLibrary'
 import ExportControls from './components/ExportControls'
+import Timeline from './components/Timeline'
 
 function App() {
   return (
@@ -11,7 +12,7 @@ function App() {
           <p className="text-xs text-gray-400">Video Editor MVP</p>
         </div>
         <div className="text-sm text-gray-400">
-          PR #3: FFmpeg Export ✓
+          PR #4: Timeline UI ✓
         </div>
       </header>
 
@@ -32,12 +33,9 @@ function App() {
             </div>
           </div>
 
-          {/* Placeholder for Timeline */}
-          <div className="h-48 bg-gray-800 border-t border-gray-700 flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <p className="text-lg mb-2">Timeline</p>
-              <p className="text-sm">(Coming in PR #4)</p>
-            </div>
+          {/* Timeline */}
+          <div className="h-48 bg-gray-800 border-t border-gray-700">
+            <Timeline />
           </div>
 
           {/* Export Controls */}

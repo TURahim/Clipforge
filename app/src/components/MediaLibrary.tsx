@@ -117,6 +117,14 @@ export default function MediaLibrary() {
     showToast(`Added "${clip.filename}" to timeline`, 'success')
   }
 
+  const handleDragStart = (e: React.DragEvent, clip: Clip) => {
+    console.log('[MediaLibrary] Drag started for:', clip.filename)
+    e.dataTransfer.effectAllowed = 'copy'
+    e.dataTransfer.setData('application/clipforge-clip', JSON.stringify(clip))
+    e.dataTransfer.setData('text/plain', clip.filename)
+    console.log('[MediaLibrary] Drag data set successfully')
+  }
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
@@ -162,7 +170,9 @@ export default function MediaLibrary() {
             {clips.map((clip) => (
               <div
                 key={clip.id}
-                className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition-colors cursor-pointer group"
+                draggable
+                onDragStart={(e) => handleDragStart(e, clip)}
+                className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition-colors cursor-grab active:cursor-grabbing group"
                 onClick={() => handleAddToTimeline(clip)}
               >
                 {/* Thumbnail */}
@@ -171,7 +181,7 @@ export default function MediaLibrary() {
                     <img
                       src={clip.thumbnail}
                       alt={clip.filename}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full object-contain pointer-events-none"
                     />
                   </div>
                 )}
@@ -190,7 +200,7 @@ export default function MediaLibrary() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Click to add to timeline
+                    Click or drag to timeline
                   </p>
                 </div>
               </div>

@@ -1,8 +1,16 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { openFileDialog, validateVideoFile } from './handlers/file.handler'
-import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips } from './handlers/ffmpeg.handler'
+import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips, diagnoseFfmpeg } from './handlers/ffmpeg.handler'
 import type { TimelineClip } from '../src/types'
+
+// Diagnostic logging for environment
+console.log('[Main] Environment check:', {
+  NODE_ENV: process.env.NODE_ENV,
+  VITE_DEV_SERVER_URL: process.env.VITE_DEV_SERVER_URL,
+  ELECTRON_RENDERER_URL: process.env.ELECTRON_RENDERER_URL,
+  isDev: !app.isPackaged
+})
 
 let mainWindow: BrowserWindow | null = null
 
@@ -27,15 +35,21 @@ function createWindow() {
   })
 
   // Load the app
-  if (process.env.VITE_DEV_SERVER_URL) {
+  // Check multiple environment variables that electron-vite might set
+  const isDev = !app.isPackaged
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL || 
+                       process.env.ELECTRON_RENDERER_URL ||
+                       (isDev ? 'http://localhost:5175' : null)
+
+  if (devServerUrl) {
     // Development mode
-    console.log('Loading dev server from:', process.env.VITE_DEV_SERVER_URL)
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
+    console.log('[Main] Loading dev server from:', devServerUrl)
+    mainWindow.loadURL(devServerUrl)
     mainWindow.webContents.openDevTools() // Open DevTools in dev mode
   } else {
     // Production mode
     const indexPath = join(__dirname, '../renderer/index.html')
-    console.log('Loading production build from:', indexPath)
+    console.log('[Main] Loading production build from:', indexPath)
     mainWindow.loadFile(indexPath)
   }
 
@@ -147,6 +161,9 @@ function registerIPCHandlers() {
 app.whenReady().then(() => {
   registerIPCHandlers()
   createWindow()
+  
+  // Run FFmpeg diagnostics on startup
+  diagnoseFfmpeg()
 
   app.on('activate', () => {
     // macOS: Re-create window when dock icon is clicked and no windows open
