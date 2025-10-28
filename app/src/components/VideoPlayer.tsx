@@ -218,13 +218,12 @@ export default function VideoPlayer() {
   }, 0)
 
   return (
-    <div className="flex-1 bg-black flex flex-col">
+    <div className="h-full bg-black flex flex-col">
       {/* Video Display */}
-      <div className="flex-1 flex items-center justify-center relative">
+      <div className="flex-1 flex items-center justify-center relative overflow-hidden">
         <video
           ref={videoRef}
-          className="max-w-full max-h-full"
-          style={{ maxHeight: 'calc(100vh - 300px)' }}
+          className="max-w-full max-h-full object-contain"
         />
         
         {/* Loading Overlay */}

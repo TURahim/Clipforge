@@ -11,9 +11,11 @@ A lightweight desktop video editor built with Electron, React, and FFmpeg.
 - **Video Import** - Import videos via drag-and-drop or file picker (MP4, MOV, AVI, MKV, WEBM)
 - **Media Library** - Visual library with thumbnails and metadata display
 - **Timeline Editing** - Canvas-based timeline with drag-and-drop clip placement
-- **Visual Feedback** - Playhead, time markers, and clip positioning
-- **Trim Clips** - Set in/out points with visual handles (coming in PR #6)
-- **Video Export** - Export to MP4 with real-time progress tracking
+- **Video Playback** - Real-time video preview with play/pause controls and audio
+- **Draggable Playhead** - Interactive scrubbing through timeline with real-time sync
+- **Trim Clips** - Set in/out points with visual handles and trim indicators
+- **Multi-Clip Export** - Export single or multiple clips with trimming support
+- **Progress Tracking** - Real-time export progress with percentage display
 - **FFmpeg Integration** - Professional video processing powered by FFmpeg (Apple Silicon optimized)
 - **Cross-Platform** - Works on macOS, Windows, and Linux
 
@@ -122,7 +124,8 @@ pnpm lint
 ### State & UI
 - **Zustand 5** - Lightweight state management
 - **TailwindCSS 3** - Utility-first CSS framework
-- **React-Konva 19** - Canvas-based timeline (planned for PR #4)
+- **React-Konva 19** - Canvas-based timeline with interactive elements
+- **Lucide React** - Modern icon library
 
 ### Video Processing
 - **FFmpeg** (via `ffmpeg-static`) - Video encoding, decoding, and processing
@@ -151,7 +154,9 @@ clipforge/app/
 │   │
 │   ├── components/           # React components
 │   │   ├── MediaLibrary.tsx  # Media library panel
-│   │   ├── ExportControls.tsx # Export UI & progress
+│   │   ├── VideoPlayer.tsx   # Video player with playback controls
+│   │   ├── Timeline.tsx      # Interactive timeline with trim handles
+│   │   ├── ExportControls.tsx # Export UI & trim controls
 │   │   └── ui/               # Reusable UI components
 │   │       ├── Toast.tsx     # Notification toasts
 │   │       └── ProgressBar.tsx # Progress indicator
@@ -160,10 +165,15 @@ clipforge/app/
 │   │   └── useStore.ts       # Zustand store
 │   │
 │   ├── utils/                # Utility functions
-│   │   └── exportUtils.ts    # FFmpeg command builders
+│   │   ├── VideoController.ts # Video controller abstraction
+│   │   ├── exportUtils.ts    # FFmpeg command builders
+│   │   ├── trimUtils.ts      # Trim validation utilities
+│   │   ├── timelineUtils.ts  # Timeline calculations
+│   │   └── __tests__/        # Unit tests
 │   │
 │   ├── types/                # TypeScript definitions
-│   │   └── index.ts          # Shared types
+│   │   ├── index.ts          # Shared types
+│   │   └── electron.d.ts     # Electron API types
 │   │
 │   └── test/                 # Test configuration
 │       └── setup.ts          # Vitest setup
@@ -199,13 +209,28 @@ clipforge/app/
 - Click any clip in the Media Library
 - The clip will be added to the timeline automatically
 - Clips are arranged sequentially
+- Drag the red playhead to scrub through the timeline
 
-### 3. Export Video
+### 3. Play & Preview
+
+- Click the **Play** button to preview your video
+- The playhead moves in sync with video playback
+- Drag the playhead to scrub to any position
+- Video automatically transitions between clips
+
+### 4. Trim Clips
+
+- Select a clip on the timeline by clicking it
+- Use the **Set In** and **Set Out** buttons to trim at the playhead position
+- Or drag the orange trim handles on the timeline
+- Visual indicators show the trimmed regions
+
+### 5. Export Video
 
 - Click the **"Export Video"** button at the bottom
 - Choose output location and filename
 - Watch the progress bar as your video exports
-- The exported MP4 will be saved to your chosen location
+- The exported MP4 will respect all trim points
 
 ## 🔧 Configuration
 
@@ -248,11 +273,26 @@ FFmpeg is bundled via `@ffmpeg-installer/ffmpeg` and `@ffprobe-installer/ffprobe
   - ✅ NaN-safe calculations
   - ✅ Playhead visualization
   - ✅ Clip positioning with visual feedback
+- [x] **PR #5:** Video Player & Playback Controls
+  - ✅ VideoController abstraction layer
+  - ✅ Play/pause functionality with audio
+  - ✅ Real-time playhead sync with video
+  - ✅ Seamless multi-clip transitions
+  - ✅ Volume controls
+- [x] **PR #6:** Trim Functionality
+  - ✅ Draggable trim handles on timeline
+  - ✅ Set In/Out buttons with playhead position
+  - ✅ Visual trim indicators (darkened regions)
+  - ✅ Trim validation and constraints
+  - ✅ Reset trim functionality
+- [x] **PR #7:** Export Pipeline
+  - ✅ Single-clip export with trimming
+  - ✅ Multi-clip concatenation
+  - ✅ Real-time progress tracking
+  - ✅ Temporary file cleanup
+  - ✅ Comprehensive unit tests
 
 ### 🚧 In Progress
-- [ ] **PR #5:** Video Player & Playback Controls
-- [ ] **PR #6:** Trim Functionality
-- [ ] **PR #7:** Multi-clip Export (concatenation)
 - [ ] **PR #8:** App Packaging & Distribution
 - [ ] **PR #9:** Bug Fixes & UI Polish
 - [ ] **PR #10:** Documentation & Demo Video

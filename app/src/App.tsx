@@ -25,17 +25,21 @@ function App() {
         </div>
 
         {/* Main Area (Timeline + Player) */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Video Player */}
-          <VideoPlayer />
+          <div className="flex-1 min-h-0">
+            <VideoPlayer />
+          </div>
 
           {/* Timeline */}
-          <div className="h-48 bg-gray-800 border-t border-gray-700">
+          <div className="h-48 bg-gray-800 border-t border-gray-700 flex-shrink-0">
             <Timeline />
           </div>
 
           {/* Export Controls */}
-          <ExportControls />
+          <div className="flex-shrink-0">
+            <ExportControls />
+          </div>
         </div>
       </div>
     </div>
