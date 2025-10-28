@@ -412,6 +412,7 @@ export async function exportSingleClip(
 
 /**
  * Export multiple clips by concatenating them
+ * Handles trim points by creating temp trimmed files first
  */
 export async function exportMultipleClips(
   clips: TimelineClip[],
@@ -431,13 +432,74 @@ export async function exportMultipleClips(
     return { success: false, error: 'FFmpeg binary not initialized' }
   }
 
-  const filelistPath = join(tmpdir(), `clipforge-export-${Date.now()}.txt`)
+  const timestamp = Date.now()
+  const tempFiles: string[] = []
+  const filelistPath = join(tmpdir(), `clipforge-filelist-${timestamp}.txt`)
 
   try {
-    // Generate filelist content
-    const filelistContent = clips.map((clip) => `file '${clip.filePath}'`).join('\n')
-    writeFileSync(filelistPath, filelistContent, 'utf-8')
+    // Phase 1: Create trimmed temp files for each clip
+    console.log('[Export] Creating', clips.length, 'temporary trimmed clips...')
+    
+    for (let i = 0; i < clips.length; i++) {
+      const clip = clips[i]
+      const isTrimmed = clip.trimStart > 0 || clip.trimEnd < clip.duration
+      
+      if (isTrimmed) {
+        // Create temp trimmed file
+        const tempPath = join(tmpdir(), `clipforge-temp-${timestamp}-${i}.mp4`)
+        tempFiles.push(tempPath)
+        
+        console.log(`[Export] Trimming clip ${i + 1}/${clips.length}: ${clip.filename}`)
+        
+        // Export trimmed clip to temp file
+        const trimResult = await exportSingleClip(clip, tempPath, null)
+        
+        if (!trimResult.success) {
+          // Clean up any created temp files
+          tempFiles.forEach(f => {
+            try { unlinkSync(f) } catch (e) { /* ignore */ }
+          })
+          return {
+            success: false,
+            error: `Failed to trim clip "${clip.filename}": ${trimResult.error}`,
+          }
+        }
+      }
+    }
 
+    // Phase 2: Generate filelist with either temp files or original files
+    console.log('[Export] Generating filelist for concatenation...')
+    const filelistContent = clips.map((clip, i) => {
+      const isTrimmed = clip.trimStart > 0 || clip.trimEnd < clip.duration
+      const filePath = isTrimmed ? tempFiles[clips.slice(0, i).filter((c, idx) => 
+        c.trimStart > 0 || c.trimEnd < c.duration
+      ).length] : clip.filePath
+      return `file '${isTrimmed ? tempFiles[tempFiles.length - clips.length + i] || clip.filePath : clip.filePath}'`
+    }).join('\n')
+    
+    // Simpler approach: rebuild filelist
+    const finalFilelistContent = clips.map((clip, i) => {
+      const isTrimmed = clip.trimStart > 0 || clip.trimEnd < clip.duration
+      if (isTrimmed) {
+        // Find corresponding temp file
+        let trimmedCount = 0
+        for (let j = 0; j < i; j++) {
+          if (clips[j].trimStart > 0 || clips[j].trimEnd < clips[j].duration) {
+            trimmedCount++
+          }
+        }
+        return `file '${tempFiles[trimmedCount]}'`
+      } else {
+        return `file '${clip.filePath}'`
+      }
+    }).join('\n')
+    
+    writeFileSync(filelistPath, finalFilelistContent, 'utf-8')
+    console.log('[Export] Filelist created:', filelistPath)
+
+    // Phase 3: Concatenate all clips
+    console.log('[Export] Concatenating clips...')
+    
     return new Promise((resolve) => {
       const args = [
         '-f', 'concat',
@@ -445,6 +507,8 @@ export async function exportMultipleClips(
         '-i', filelistPath,
         '-c:v', 'libx264',
         '-c:a', 'aac',
+        '-preset', 'medium',
+        '-crf', '23',
         '-y',
         outputPath,
       ]
@@ -458,10 +522,10 @@ export async function exportMultipleClips(
         stderr += output
 
         // Parse progress
-        const timeMatch = output.match(/time=(\d+):(\d+):(\d+\.\d+)/)
+        const timeMatch = output.match(/time=(\d+):(\d+):(\d+\.?\d*)/)
         if (timeMatch && mainWindow) {
-          const hours = parseInt(timeMatch[1])
-          const minutes = parseInt(timeMatch[2])
+          const hours = parseInt(timeMatch[1], 10)
+          const minutes = parseInt(timeMatch[2], 10)
           const seconds = parseFloat(timeMatch[3])
           const currentTime = hours * 3600 + minutes * 60 + seconds
           const percentage = Math.min(Math.round((currentTime / totalDuration) * 100), 100)
@@ -475,11 +539,12 @@ export async function exportMultipleClips(
       })
 
       ffmpeg.on('error', (error) => {
-        try {
-          unlinkSync(filelistPath)
-        } catch (err) {
-          // Ignore cleanup errors
-        }
+        // Clean up
+        try { unlinkSync(filelistPath) } catch (e) { /* ignore */ }
+        tempFiles.forEach(f => {
+          try { unlinkSync(f) } catch (e) { /* ignore */ }
+        })
+        
         resolve({
           success: false,
           error: `Failed to spawn FFmpeg: ${error.message}`,
@@ -487,12 +552,18 @@ export async function exportMultipleClips(
       })
 
       ffmpeg.on('close', (code) => {
-        // Clean up temp file
-        try {
-          unlinkSync(filelistPath)
-        } catch (error) {
-          console.warn('[FFmpeg] Failed to delete temp filelist:', error)
+        // Clean up temp files
+        try { unlinkSync(filelistPath) } catch (e) {
+          console.warn('[Export] Failed to delete filelist:', e)
         }
+        tempFiles.forEach(f => {
+          try {
+            unlinkSync(f)
+            console.log('[Export] Cleaned up temp file:', f)
+          } catch (e) {
+            console.warn('[Export] Failed to delete temp file:', f, e)
+          }
+        })
 
         if (code !== 0) {
           resolve({
@@ -510,13 +581,20 @@ export async function exportMultipleClips(
           return
         }
 
+        console.log('[Export] Export complete:', outputPath)
         resolve({ success: true })
       })
     })
   } catch (error) {
+    // Clean up on error
+    try { unlinkSync(filelistPath) } catch (e) { /* ignore */ }
+    tempFiles.forEach(f => {
+      try { unlinkSync(f) } catch (e) { /* ignore */ }
+    })
+    
     return {
       success: false,
-      error: `Failed to create filelist: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error: `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }
   }
 }

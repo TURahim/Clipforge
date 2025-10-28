@@ -1,6 +1,7 @@
 import MediaLibrary from './components/MediaLibrary'
 import ExportControls from './components/ExportControls'
 import Timeline from './components/Timeline'
+import VideoPlayer from './components/VideoPlayer'
 
 function App() {
   return (
@@ -12,7 +13,7 @@ function App() {
           <p className="text-xs text-gray-400">Video Editor MVP</p>
         </div>
         <div className="text-sm text-gray-400">
-          PR #4: Timeline UI ✓
+          PR #7: Export Pipeline ✓
         </div>
       </header>
 
@@ -23,15 +24,10 @@ function App() {
           <MediaLibrary />
         </div>
 
-        {/* Main Area (Timeline + Player will go here) */}
+        {/* Main Area (Timeline + Player) */}
         <div className="flex-1 flex flex-col">
-          {/* Placeholder for Video Player */}
-          <div className="flex-1 bg-black flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <p className="text-lg mb-2">Video Player</p>
-              <p className="text-sm">(Coming in PR #5)</p>
-            </div>
-          </div>
+          {/* Video Player */}
+          <VideoPlayer />
 
           {/* Timeline */}
           <div className="h-48 bg-gray-800 border-t border-gray-700">

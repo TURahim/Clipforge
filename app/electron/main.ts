@@ -1,8 +1,23 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol } from 'electron'
 import { join } from 'path'
+import { readFile, stat } from 'fs/promises'
 import { openFileDialog, validateVideoFile } from './handlers/file.handler'
 import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips, diagnoseFfmpeg } from './handlers/ffmpeg.handler'
 import type { TimelineClip } from '../src/types'
+
+// Register privileged schemes before app is ready
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'clipforge',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true, // Enable streaming for video
+    },
+  },
+])
 
 // Diagnostic logging for environment
 console.log('[Main] Environment check:', {
@@ -15,15 +30,49 @@ console.log('[Main] Environment check:', {
 let mainWindow: BrowserWindow | null = null
 
 function createWindow() {
+  // Determine if we're in dev mode by checking for dev server environment variables
+  // Don't rely on app.isPackaged as it's false when running with 'npx electron .'
+  const hasDevServer = !!(process.env.VITE_DEV_SERVER_URL || process.env.ELECTRON_RENDERER_URL)
+  const isDev = hasDevServer
+  
+  // Get the correct base path for resources
+  const appPath = app.getAppPath()
+  const resourcesPath = isDev ? __dirname : appPath
+  
+  console.log('[Main] Paths:', {
+    isDev,
+    hasDevServer,
+    __dirname,
+    appPath,
+    resourcesPath,
+    isPackaged: app.isPackaged,
+  })
+  
+  // Preload path: 
+  // - Dev mode (with dev server): use .cjs from dev build
+  // - Production (npx electron .): use .cjs if exists, otherwise .js
+  let preloadPath: string
+  if (isDev) {
+    preloadPath = join(__dirname, '../preload/preload.cjs')
+  } else {
+    // Try .cjs first (dev build), fall back to .js (production build)
+    const cjsPath = join(resourcesPath, 'out/preload/preload.cjs')
+    const jsPath = join(resourcesPath, 'out/preload/preload.js')
+    preloadPath = require('fs').existsSync(cjsPath) ? cjsPath : jsPath
+  }
+  
+  console.log('[Main] Preload path:', preloadPath)
+  
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1200,
     minHeight: 700,
     webPreferences: {
-      preload: join(__dirname, '../preload/preload.cjs'),
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
+      webSecurity: true, // Keep security enabled
     },
     titleBarStyle: 'hiddenInset', // macOS native look
     show: false, // Show window when ready to prevent flicker
@@ -31,31 +80,42 @@ function createWindow() {
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
+    console.log('[Main] Window ready to show')
     mainWindow?.show()
   })
 
   // Load the app
-  // Check multiple environment variables that electron-vite might set
-  const isDev = !app.isPackaged
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL || 
-                       process.env.ELECTRON_RENDERER_URL ||
-                       (isDev ? 'http://localhost:5175' : null)
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL || process.env.ELECTRON_RENDERER_URL
 
   if (devServerUrl) {
-    // Development mode
+    // Development mode - load from dev server
     console.log('[Main] Loading dev server from:', devServerUrl)
     mainWindow.loadURL(devServerUrl)
     mainWindow.webContents.openDevTools() // Open DevTools in dev mode
   } else {
-    // Production mode
-    const indexPath = join(__dirname, '../renderer/index.html')
+    // Production mode - load built files
+    const indexPath = join(resourcesPath, 'out/renderer/index.html')
     console.log('[Main] Loading production build from:', indexPath)
-    mainWindow.loadFile(indexPath)
+    
+    // Try to load the file
+    mainWindow.loadFile(indexPath).catch((err) => {
+      console.error('[Main] Failed to load renderer:', err)
+      // Show error in window
+      mainWindow?.loadURL(`data:text/html,<h1>Failed to load renderer</h1><pre>${err}</pre>`)
+    })
   }
 
   // Error handling
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.error('Failed to load:', errorCode, errorDescription)
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('[Main] Failed to load:', {
+      errorCode,
+      errorDescription,
+      validatedURL,
+    })
+  })
+  
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('[Main] Renderer finished loading')
   })
 
   mainWindow.on('closed', () => {
@@ -157,8 +217,84 @@ function registerIPCHandlers() {
   })
 }
 
+// Register custom protocol for serving local video files
+function registerCustomProtocol() {
+  protocol.handle('clipforge', async (request) => {
+    try {
+      // Extract file path from URL (e.g., clipforge://video/path/to/file.mp4)
+      const url = request.url
+      const filePath = decodeURIComponent(url.replace('clipforge://video/', ''))
+      
+      console.log('[Protocol] Serving video file:', filePath)
+      
+      // Get file stats for Content-Length
+      const fileStats = await stat(filePath)
+      const fileSize = fileStats.size
+      
+      // Determine MIME type based on extension
+      let mimeType = 'video/mp4'
+      if (filePath.endsWith('.mov') || filePath.endsWith('.MOV')) mimeType = 'video/quicktime'
+      else if (filePath.endsWith('.avi')) mimeType = 'video/x-msvideo'
+      else if (filePath.endsWith('.mkv')) mimeType = 'video/x-matroska'
+      else if (filePath.endsWith('.webm')) mimeType = 'video/webm'
+      
+      // Check for Range header (for video seeking)
+      const rangeHeader = request.headers.get('range')
+      
+      if (rangeHeader) {
+        // Parse range header
+        const parts = rangeHeader.replace(/bytes=/, '').split('-')
+        const start = parseInt(parts[0], 10)
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+        const chunkSize = (end - start) + 1
+        
+        console.log('[Protocol] Range request:', { start, end, chunkSize, fileSize })
+        
+        // Read the requested chunk
+        const fs = require('fs')
+        const stream = fs.createReadStream(filePath, { start, end })
+        
+        // Convert stream to buffer
+        const chunks: Buffer[] = []
+        for await (const chunk of stream) {
+          chunks.push(chunk)
+        }
+        const data = Buffer.concat(chunks)
+        
+        return new Response(data, {
+          status: 206,
+          headers: {
+            'Content-Type': mimeType,
+            'Content-Length': chunkSize.toString(),
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+          },
+        })
+      } else {
+        // Serve entire file
+        const data = await readFile(filePath)
+        
+        return new Response(data, {
+          status: 200,
+          headers: {
+            'Content-Type': mimeType,
+            'Content-Length': fileSize.toString(),
+            'Accept-Ranges': 'bytes',
+          },
+        })
+      }
+    } catch (error) {
+      console.error('[Protocol] Failed to serve video:', error)
+      return new Response(`File not found: ${error}`, { status: 404 })
+    }
+  })
+}
+
 // App lifecycle
 app.whenReady().then(() => {
+  // Register custom protocol before creating window
+  registerCustomProtocol()
+  
   registerIPCHandlers()
   createWindow()
   

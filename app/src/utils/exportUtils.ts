@@ -1,7 +1,13 @@
+/**
+ * Export Utilities - Functions for building FFmpeg export commands
+ */
+
+import { tmpdir } from 'os'
+import { join } from 'path'
 import type { TimelineClip } from '../types'
 
 /**
- * Build FFmpeg command arguments for single-clip export
+ * Build FFmpeg command for single clip export
  */
 export function buildSingleClipExportCommand(
   clip: TimelineClip,
@@ -9,7 +15,7 @@ export function buildSingleClipExportCommand(
 ): string[] {
   const args: string[] = []
 
-  // Add trim start if needed
+  // Add trim start if needed (seek to start position)
   if (clip.trimStart > 0) {
     args.push('-ss', clip.trimStart.toString())
   }
@@ -17,17 +23,21 @@ export function buildSingleClipExportCommand(
   // Input file
   args.push('-i', clip.filePath)
 
-  // Add trim duration if needed
-  if (clip.trimEnd < clip.duration) {
-    const duration = clip.trimEnd - clip.trimStart
-    args.push('-t', duration.toString())
+  // Add duration if clip is trimmed
+  const effectiveDuration = clip.trimEnd - clip.trimStart
+  if (clip.trimEnd < clip.duration || clip.trimStart > 0) {
+    args.push('-t', effectiveDuration.toString())
   }
 
-  // Video codec
+  // Video codec - use libx264 for compatibility
   args.push('-c:v', 'libx264')
   
-  // Audio codec
+  // Audio codec - use aac for compatibility
   args.push('-c:a', 'aac')
+  
+  // Quality settings
+  args.push('-preset', 'medium')
+  args.push('-crf', '23')
   
   // Output file
   args.push(outputPath)
@@ -36,7 +46,7 @@ export function buildSingleClipExportCommand(
 }
 
 /**
- * Build FFmpeg command arguments for multi-clip export using concat demuxer
+ * Build FFmpeg command for concatenating multiple clips
  */
 export function buildConcatExportCommand(
   filelistPath: string,
@@ -44,16 +54,19 @@ export function buildConcatExportCommand(
 ): string[] {
   return [
     '-f', 'concat',
-    '-safe', '0', // Allow absolute paths
+    '-safe', '0', // Allow absolute file paths
     '-i', filelistPath,
     '-c:v', 'libx264',
     '-c:a', 'aac',
+    '-preset', 'medium',
+    '-crf', '23',
     outputPath,
   ]
 }
 
 /**
- * Generate filelist.txt content for concat demuxer
+ * Generate filelist content for FFmpeg concat demuxer
+ * Each line: file '/absolute/path/to/file.mp4'
  */
 export function generateFilelistContent(clips: TimelineClip[]): string {
   return clips
@@ -62,27 +75,44 @@ export function generateFilelistContent(clips: TimelineClip[]): string {
 }
 
 /**
+ * Generate temporary filelist path
+ */
+export function generateTempFilelistPath(): string {
+  const timestamp = Date.now()
+  return join(tmpdir(), `clipforge-filelist-${timestamp}.txt`)
+}
+
+/**
  * Parse FFmpeg progress from stderr output
- * Looks for "time=HH:MM:SS.ms" pattern
+ * FFmpeg outputs progress like: time=00:01:23.45
  */
 export function parseExportProgress(
-  stderr: string,
+  stderrLine: string,
   totalDuration: number
 ): number {
-  const match = stderr.match(/time=(\d+):(\d+):(\d+\.\d+)/)
-  if (!match) return 0
+  // Match time=HH:MM:SS.MS pattern
+  const timeMatch = stderrLine.match(/time=(\d+):(\d+):(\d+\.?\d*)/)
+  
+  if (!timeMatch) {
+    return 0
+  }
 
-  const hours = parseInt(match[1])
-  const minutes = parseInt(match[2])
-  const seconds = parseFloat(match[3])
+  const hours = parseInt(timeMatch[1], 10)
+  const minutes = parseInt(timeMatch[2], 10)
+  const seconds = parseFloat(timeMatch[3])
+
   const currentTime = hours * 3600 + minutes * 60 + seconds
+
+  if (totalDuration === 0) {
+    return 0
+  }
 
   const percentage = (currentTime / totalDuration) * 100
   return Math.min(Math.round(percentage), 100)
 }
 
 /**
- * Calculate total duration of timeline clips
+ * Calculate total duration of all clips (respecting trim)
  */
 export function calculateTotalExportDuration(clips: TimelineClip[]): number {
   return clips.reduce((total, clip) => {
@@ -91,3 +121,27 @@ export function calculateTotalExportDuration(clips: TimelineClip[]): number {
   }, 0)
 }
 
+/**
+ * Validate export clips
+ */
+export function validateExportClips(clips: TimelineClip[]): {
+  valid: boolean
+  error?: string
+} {
+  if (clips.length === 0) {
+    return { valid: false, error: 'No clips to export' }
+  }
+
+  for (const clip of clips) {
+    if (!clip.filePath) {
+      return { valid: false, error: `Clip "${clip.filename}" has no file path` }
+    }
+
+    const effectiveDuration = clip.trimEnd - clip.trimStart
+    if (effectiveDuration <= 0) {
+      return { valid: false, error: `Clip "${clip.filename}" has invalid trim (duration: ${effectiveDuration}s)` }
+    }
+  }
+
+  return { valid: true }
+}

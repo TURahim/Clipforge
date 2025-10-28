@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Stage, Layer, Rect, Line, Text, Group } from 'react-konva'
+import type { KonvaEventObject } from 'konva/lib/Node'
 import { useStore } from '../store/useStore'
 import Toast from './ui/Toast'
 import {
@@ -10,8 +11,8 @@ import {
   formatTime,
   generateTimeMarkers,
   secondsToPixels,
-  safeDuration,
 } from '../utils/timelineUtils'
+import { constrainTrimPoint } from '../utils/trimUtils'
 
 export default function Timeline() {
   const timelineClips = useStore((state) => state.timelineClips)
@@ -20,6 +21,7 @@ export default function Timeline() {
   const setSelectedClip = useStore((state) => state.selectClip)
   const setPlayheadPosition = useStore((state) => state.setPlayheadPosition)
   const addToTimeline = useStore((state) => state.addToTimeline)
+  const updateClipTrim = useStore((state) => state.updateClipTrim)
 
   // Diagnostic logging
   console.log('[Timeline] typeof addToTimeline =', typeof addToTimeline)
@@ -145,11 +147,8 @@ export default function Timeline() {
         width={Math.max(containerSize.width, timelineWidth)} 
         height={containerSize.height} 
         onClick={handleStageClick}
-        // @ts-expect-error: DOM event passthrough for better cross-platform DnD support
         onDrop={handleDrop as any}
-        // @ts-expect-error: DOM event passthrough
         onDragOver={handleDragOver as any}
-        // @ts-expect-error: DOM event passthrough
         onDragLeave={handleDragLeave as any}
       >
         <Layer>
@@ -209,11 +208,28 @@ export default function Timeline() {
                 }
               }
 
+              const totalClipWidth = clip.duration * PIXELS_PER_SECOND
+              const trimStartWidth = clip.trimStart * PIXELS_PER_SECOND
+              const trimEndWidth = (clip.duration - clip.trimEnd) * PIXELS_PER_SECOND
+
               return (
                 <Group key={clip.id}>
-                  {/* Clip rectangle */}
+                  {/* Trimmed-out region (left) - darkened */}
+                  {clip.trimStart > 0 && (
+                    <Rect
+                      x={clipX}
+                      y={0}
+                      width={trimStartWidth}
+                      height={TIMELINE_HEIGHT}
+                      fill="rgba(0,0,0,0.6)"
+                      cornerRadius={4}
+                      onClick={() => handleClipClick(clip.id)}
+                    />
+                  )}
+
+                  {/* Active/visible region */}
                   <Rect
-                    x={clipX}
+                    x={clipX + trimStartWidth}
                     y={0}
                     width={clipWidth}
                     height={TIMELINE_HEIGHT}
@@ -227,9 +243,93 @@ export default function Timeline() {
                     onClick={() => handleClipClick(clip.id)}
                   />
 
+                  {/* Trimmed-out region (right) - darkened */}
+                  {clip.trimEnd < clip.duration && (
+                    <Rect
+                      x={clipX + trimStartWidth + clipWidth}
+                      y={0}
+                      width={trimEndWidth}
+                      height={TIMELINE_HEIGHT}
+                      fill="rgba(0,0,0,0.6)"
+                      cornerRadius={4}
+                      onClick={() => handleClipClick(clip.id)}
+                    />
+                  )}
+
+                  {/* Left trim handle (in-point) */}
+                  {isSelected && (
+                    <Rect
+                      x={clipX + trimStartWidth - 5}
+                      y={0}
+                      width={10}
+                      height={TIMELINE_HEIGHT}
+                      fill="#FFA500"
+                      cornerRadius={2}
+                      draggable
+                      dragBoundFunc={(pos) => {
+                        // Constrain to clip bounds
+                        const minX = clipX
+                        const maxX = clipX + trimStartWidth + clipWidth - 10
+                        return {
+                          x: Math.max(minX, Math.min(maxX, pos.x)),
+                          y: 40, // Keep on same y level
+                        }
+                      }}
+                      onDragEnd={(e: KonvaEventObject<DragEvent>) => {
+                        const handleX = e.target.x()
+                        const newTrimStart = (handleX - clipX) / PIXELS_PER_SECOND
+                        const constrained = constrainTrimPoint(newTrimStart, 0, clip.trimEnd - 0.5)
+                        updateClipTrim(clip.id, constrained, clip.trimEnd)
+                      }}
+                      onMouseEnter={(e) => {
+                        const container = e.target.getStage()?.container()
+                        if (container) container.style.cursor = 'ew-resize'
+                      }}
+                      onMouseLeave={(e) => {
+                        const container = e.target.getStage()?.container()
+                        if (container) container.style.cursor = 'default'
+                      }}
+                    />
+                  )}
+
+                  {/* Right trim handle (out-point) */}
+                  {isSelected && (
+                    <Rect
+                      x={clipX + trimStartWidth + clipWidth - 5}
+                      y={0}
+                      width={10}
+                      height={TIMELINE_HEIGHT}
+                      fill="#FFA500"
+                      cornerRadius={2}
+                      draggable
+                      dragBoundFunc={(pos) => {
+                        const minX = clipX + trimStartWidth + 10
+                        const maxX = clipX + totalClipWidth
+                        return {
+                          x: Math.max(minX, Math.min(maxX, pos.x)),
+                          y: 40,
+                        }
+                      }}
+                      onDragEnd={(e: KonvaEventObject<DragEvent>) => {
+                        const handleX = e.target.x()
+                        const newTrimEnd = (handleX - clipX) / PIXELS_PER_SECOND
+                        const constrained = constrainTrimPoint(newTrimEnd, clip.trimStart + 0.5, clip.duration)
+                        updateClipTrim(clip.id, clip.trimStart, constrained)
+                      }}
+                      onMouseEnter={(e) => {
+                        const container = e.target.getStage()?.container()
+                        if (container) container.style.cursor = 'ew-resize'
+                      }}
+                      onMouseLeave={(e) => {
+                        const container = e.target.getStage()?.container()
+                        if (container) container.style.cursor = 'default'
+                      }}
+                    />
+                  )}
+
                   {/* Clip label */}
                   <Text
-                    x={clipX + 10}
+                    x={clipX + trimStartWidth + 10}
                     y={10}
                     text={clip.filename}
                     fontSize={14}
@@ -241,7 +341,7 @@ export default function Timeline() {
 
                   {/* Duration label */}
                   <Text
-                    x={clipX + 10}
+                    x={clipX + trimStartWidth + 10}
                     y={TIMELINE_HEIGHT - 25}
                     text={formatTime(Number(clip.trimEnd) - Number(clip.trimStart))}
                     fontSize={12}
@@ -266,9 +366,10 @@ export default function Timeline() {
                 ]}
                 stroke="#ef4444"
                 strokeWidth={2}
+                listening={false}
               />
 
-              {/* Playhead handle (top) */}
+              {/* Playhead handle (top) - DRAGGABLE */}
               <Rect
                 x={secondsToPixels(playheadPosition) - 8}
                 y={0}
@@ -276,6 +377,38 @@ export default function Timeline() {
                 height={20}
                 fill="#ef4444"
                 cornerRadius={4}
+                draggable
+                dragBoundFunc={(pos) => {
+                  // Constrain to timeline bounds
+                  const minX = 0
+                  const maxX = secondsToPixels(totalDuration)
+                  return {
+                    x: Math.max(minX, Math.min(maxX, pos.x + 8)) - 8, // +8 to account for handle offset
+                    y: 0, // Keep at top
+                  }
+                }}
+                onDragMove={(e: KonvaEventObject<DragEvent>) => {
+                  const handleX = e.target.x() + 8 // Center of handle
+                  const newTime = handleX / PIXELS_PER_SECOND
+                  const constrainedTime = Math.max(0, Math.min(totalDuration, newTime))
+                  setPlayheadPosition(constrainedTime)
+                }}
+                onMouseEnter={(e) => {
+                  const container = e.target.getStage()?.container()
+                  if (container) container.style.cursor = 'grab'
+                }}
+                onMouseDown={(e) => {
+                  const container = e.target.getStage()?.container()
+                  if (container) container.style.cursor = 'grabbing'
+                }}
+                onMouseUp={(e) => {
+                  const container = e.target.getStage()?.container()
+                  if (container) container.style.cursor = 'grab'
+                }}
+                onMouseLeave={(e) => {
+                  const container = e.target.getStage()?.container()
+                  if (container) container.style.cursor = 'default'
+                }}
               />
 
               {/* Playhead time display */}
@@ -286,6 +419,7 @@ export default function Timeline() {
                 fontSize={12}
                 fill="#fecaca"
                 fontStyle="bold"
+                listening={false}
               />
             </Group>
           )}

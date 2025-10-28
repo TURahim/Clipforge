@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../store/useStore'
+import { Scissors, RotateCcw } from 'lucide-react'
 import ProgressBar from './ui/ProgressBar'
 import Toast from './ui/Toast'
 
@@ -10,9 +11,14 @@ interface ToastState {
 
 export default function ExportControls() {
   const timelineClips = useStore((state) => state.timelineClips)
+  const selectedClipId = useStore((state) => state.selectedClipId)
+  const playheadPosition = useStore((state) => state.playheadPosition)
   const exportProgress = useStore((state) => state.exportProgress)
   const setExportProgress = useStore((state) => state.setExportProgress)
+  const updateClipTrim = useStore((state) => state.updateClipTrim)
   const [toast, setToast] = useState<ToastState | null>(null)
+  
+  const selectedClip = timelineClips.find(c => c.id === selectedClipId)
 
   const showToast = (message: string, type: ToastState['type']) => {
     setToast({ message, type })
@@ -117,10 +123,93 @@ export default function ExportControls() {
     (sum, clip) => sum + (clip.trimEnd - clip.trimStart),
     0
   )
+  
+  const handleSetInPoint = () => {
+    if (!selectedClip) return
+    
+    // Calculate the time within the selected clip
+    const clipLocalTime = playheadPosition - selectedClip.startTime
+    const newTrimStart = Math.max(0, Math.min(clipLocalTime, selectedClip.trimEnd - 0.5))
+    
+    updateClipTrim(selectedClip.id, newTrimStart, selectedClip.trimEnd)
+    showToast('In-point set', 'success')
+  }
+  
+  const handleSetOutPoint = () => {
+    if (!selectedClip) return
+    
+    const clipLocalTime = playheadPosition - selectedClip.startTime
+    const newTrimEnd = Math.max(selectedClip.trimStart + 0.5, Math.min(clipLocalTime, selectedClip.duration))
+    
+    updateClipTrim(selectedClip.id, selectedClip.trimStart, newTrimEnd)
+    showToast('Out-point set', 'success')
+  }
+  
+  const handleResetTrim = () => {
+    if (!selectedClip) return
+    
+    updateClipTrim(selectedClip.id, 0, selectedClip.duration)
+    showToast('Trim reset to full clip', 'success')
+  }
 
   return (
     <div className="bg-gray-800 border-t border-gray-700 p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto space-y-4">
+        {/* Trim Controls - Show when clip is selected */}
+        {selectedClip && (
+          <div className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+            <div className="flex items-center justify-between gap-6">
+              {/* Clip Info */}
+              <div className="flex-1">
+                <div className="text-xs text-gray-400 mb-1">Selected Clip</div>
+                <div className="font-semibold text-white mb-1">{selectedClip.filename}</div>
+                <div className="text-sm space-y-1">
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <span className="text-gray-400">Original:</span>
+                    <span>{formatTime(selectedClip.duration)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-blue-400">
+                    <Scissors className="w-3 h-3" />
+                    <span className="text-gray-400">Trimmed:</span>
+                    <span className="font-semibold">{formatTime(selectedClip.trimEnd - selectedClip.trimStart)}</span>
+                    {(selectedClip.trimStart > 0 || selectedClip.trimEnd < selectedClip.duration) && (
+                      <span className="text-xs text-gray-500">
+                        ({formatTime(selectedClip.trimStart)} - {formatTime(selectedClip.trimEnd)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Trim Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSetInPoint}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  title="Set trim in-point at playhead position"
+                >
+                  <span>[ Set In</span>
+                </button>
+                <button
+                  onClick={handleSetOutPoint}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors text-sm font-medium"
+                  title="Set trim out-point at playhead position"
+                >
+                  <span>Set Out ]</span>
+                </button>
+                <button
+                  onClick={handleResetTrim}
+                  className="flex items-center gap-2 px-3 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded-lg transition-colors text-sm"
+                  title="Reset trim to full clip"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Export Controls */}
         <div className="flex items-center justify-between gap-6">
           {/* Timeline Info */}
           <div className="flex-1">
@@ -128,7 +217,7 @@ export default function ExportControls() {
               {timelineClips.length} clip{timelineClips.length !== 1 ? 's' : ''} on timeline
             </div>
             <div className="text-lg font-semibold">
-              Duration: {formatTime(totalDuration)}
+              Total Duration: {formatTime(totalDuration)}
             </div>
           </div>
 
