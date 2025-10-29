@@ -112,9 +112,10 @@ export default function MediaLibrary() {
     }
   }
 
-  const handleAddToTimeline = (clip: Clip) => {
-    addToTimeline(clip)
-    showToast(`Added "${clip.filename}" to timeline`, 'success')
+  const handleAddToTimeline = (clip: Clip, track: number = 0) => {
+    addToTimeline(clip, track)
+    const trackName = track === 0 ? 'Main Track' : 'Overlay Track'
+    showToast(`Added "${clip.filename}" to ${trackName}`, 'success')
   }
 
   const handleDragStart = (e: React.DragEvent, clip: Clip) => {
@@ -182,7 +183,6 @@ export default function MediaLibrary() {
                 draggable
                 onDragStart={(e) => handleDragStart(e, clip)}
                 className="bg-gray-700 rounded-lg overflow-hidden hover:bg-gray-600 transition-colors cursor-grab active:cursor-grabbing group"
-                onClick={() => handleAddToTimeline(clip)}
               >
                 {/* Thumbnail */}
                 {clip.thumbnail && (
@@ -200,7 +200,7 @@ export default function MediaLibrary() {
                   <p className="text-sm font-medium truncate mb-1">
                     {clip.filename}
                   </p>
-                  <div className="flex items-center justify-between text-xs text-gray-400">
+                  <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
                     <span>{formatTime(clip.duration)}</span>
                     {clip.metadata && (
                       <span>
@@ -208,8 +208,33 @@ export default function MediaLibrary() {
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    Click or drag to timeline
+                  
+                  {/* Track Selection Buttons */}
+                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleAddToTimeline(clip, 0)
+                      }}
+                      className="flex-1 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+                      title="Add to Main Track"
+                    >
+                      Main Track
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleAddToTimeline(clip, 1)
+                      }}
+                      className="flex-1 px-2 py-1 text-xs bg-purple-600 hover:bg-purple-700 rounded transition-colors"
+                      title="Add to Overlay Track (for PiP)"
+                    >
+                      Overlay
+                    </button>
+                  </div>
+                  
+                  <p className="text-xs text-gray-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    Or drag to specific track
                   </p>
                 </div>
               </div>

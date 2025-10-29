@@ -61,7 +61,7 @@ interface AppState {
   // Actions
   addClip: (clip: Clip) => void
   removeClip: (id: string) => void
-  addToTimeline: (clip: Clip) => void
+  addToTimeline: (clip: Clip, track?: number) => void
   removeFromTimeline: (id: string) => void
   selectClip: (id: string | null) => void
   setPlayheadPosition: (position: number) => void
@@ -131,9 +131,9 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       selectedClipId: state.selectedClipId === id ? null : state.selectedClipId,
     })),
   
-  addToTimeline: (incoming: Clip) =>
+  addToTimeline: (incoming: Clip, track?: number) =>
     set((state) => {
-      console.log('[Store] addToTimeline called with:', incoming.filename)
+      console.log('[Store] addToTimeline called with:', incoming.filename, 'track:', track)
       console.log('[Store] Current timeline clips:', state.timelineClips.length)
       
       // Validate incoming clip has required fields
@@ -153,8 +153,12 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       
       console.log('[Store] Coerced values:', { trimStart, trimEnd, duration })
       
-      // Calculate start time based on total duration of existing clips
-      const startTime = getTotalDuration(state.timelineClips)
+      // Use provided track or default to main track (0)
+      const assignedTrack = track !== undefined ? Math.max(0, Math.min(1, track)) : 0
+      
+      // Calculate start time based on total duration of existing clips on the same track
+      const clipsOnSameTrack = state.timelineClips.filter((c: TimelineClip) => c.track === assignedTrack)
+      const startTime = getTotalDuration(clipsOnSameTrack)
       
       // Validate that trim values are within bounds
       const boundedTrimStart = Math.max(0, Math.min(trimStart, duration))
@@ -173,8 +177,9 @@ const storeConfig: StateCreator<AppState> = (set) => ({
         trimStart: boundedTrimStart,
         trimEnd: boundedTrimEnd,
         duration,
-        track: 0, // Default to main track
-        scale: 1.0, // Default full size
+        track: assignedTrack,
+        scale: assignedTrack === 1 ? 0.25 : 1.0, // Small for overlay, full size for main
+        position: assignedTrack === 1 ? { x: 20, y: 20 } : undefined, // Default overlay position
       }
       
       console.log('[Store] New timeline clip created:', {

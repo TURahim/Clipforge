@@ -114,6 +114,22 @@ export default function Timeline() {
         const raw = JSON.parse(clipData)
         console.log('[Timeline] Parsed raw clip:', raw.filename, 'duration:', raw.duration)
         
+        // Detect which track the drop occurred on based on Y position
+        const rect = (e.target as HTMLElement).getBoundingClientRect()
+        const dropY = e.clientY - rect.top
+        
+        // Account for time markers (30px) and Group offset
+        const relativeY = dropY - 30
+        const detectedTrack = getTrackFromY(relativeY)
+        
+        console.log('[Timeline] Drop position:', {
+          clientY: e.clientY,
+          rectTop: rect.top,
+          dropY,
+          relativeY,
+          detectedTrack
+        })
+        
         // Harden clip data with safe defaults before passing to store
         const clip = {
           ...raw,
@@ -133,9 +149,11 @@ export default function Timeline() {
           trimEnd: clip.trimEnd,
         })
         
-        addToTimeline(clip)
-        console.log('[Timeline] Clip added to timeline successfully')
-        setToast({ message: `Clip "${clip.filename}" added to timeline`, type: 'success' })
+        // Add to timeline with detected track
+        addToTimeline(clip, detectedTrack)
+        const trackName = detectedTrack === 0 ? 'Main Track' : 'Overlay Track'
+        console.log('[Timeline] Clip added to', trackName)
+        setToast({ message: `Clip "${clip.filename}" added to ${trackName}`, type: 'success' })
       } else {
         console.warn('[Timeline] No clip data in drop event')
       }
