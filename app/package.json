@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "prebuild": "node -e \"const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json'));pkg.main='out/main/main.cjs';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2))\"",
-    "build": "electron-vite build && node -e \"const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json'));pkg.main='out/main/main.js';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2))\"",
+    "build": "electron-vite build && node -e \"const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json'));pkg.main='out/main/main.js';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2))\" && node scripts/copy-binaries.js",
     "postbuild": "echo '✅ Build complete. Main: main.js (production ready with bytecode)'",
     "preview": "electron-vite preview",
     "start:prod": "node -e \"const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json'));pkg.main='out/main/main.js';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2))\" && npx electron .",
@@ -67,6 +67,15 @@
     "files": [
       "out/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": ".",
+        "filter": [
+          "**/*"
+        ]
+      }
     ],
     "directories": {
       "buildResources": "build",
