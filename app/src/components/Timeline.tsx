@@ -285,17 +285,45 @@ export default function Timeline() {
                     onMouseEnter={() => setHoveredClipId(clip.id)}
                     onMouseLeave={() => setHoveredClipId(null)}
                     draggable
+                    dragBoundFunc={(pos) => {
+                      // Allow vertical movement between tracks, but keep horizontal position
+                      // Constrain Y to valid track range
+                      const minY = 30 + getTrackY(0) // 30 is Group y offset
+                      const maxY = 30 + getTrackY(NUM_TRACKS - 1)
+                      return {
+                        x: clipX + trimStartWidth,
+                        y: Math.max(minY, Math.min(maxY, pos.y))
+                      }
+                    }}
                     onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-                      const newY = e.target.y()
-                      const newTrack = getTrackFromY(newY - 30) // -30 for Group offset
+                      const absoluteY = e.target.y()
+                      // Remove Group offset (30) to get relative Y position
+                      const relativeY = absoluteY - 30
+                      const newTrack = getTrackFromY(relativeY)
+                      
+                      console.log('[Timeline] Drag ended:', {
+                        absoluteY,
+                        relativeY,
+                        currentTrack: clip.track,
+                        newTrack
+                      })
                       
                       if (newTrack !== clip.track) {
-                        console.log('[Timeline] Moving clip to track:', newTrack)
+                        console.log('[Timeline] Moving clip from track', clip.track, 'to track', newTrack)
                         updateClipTrack(clip.id, newTrack)
                       }
                       
-                      // Reset position after drag (we don't support horizontal dragging yet)
-                      e.target.position({ x: clipX + trimStartWidth, y: trackY })
+                      // Snap to correct track position
+                      const targetTrackY = getTrackY(newTrack)
+                      e.target.position({ x: clipX + trimStartWidth, y: targetTrackY + 30 })
+                    }}
+                    onMouseDown={(e) => {
+                      const container = e.target.getStage()?.container()
+                      if (container) container.style.cursor = 'move'
+                    }}
+                    onMouseUp={(e) => {
+                      const container = e.target.getStage()?.container()
+                      if (container) container.style.cursor = 'default'
                     }}
                   />
 
