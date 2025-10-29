@@ -20,6 +20,9 @@ export default function VideoPlayer() {
     isPlayingRef.current = isPlaying
   }, [isPlaying])
   
+  // Use ref to prevent double transitions (race condition between onUpdate and onEnded)
+  const isTransitioningRef = useRef(false)
+  
   const [currentClipIndex, setCurrentClipIndex] = useState<number>(-1)
   const [volume, setVolume] = useState<number>(1)
   const [isMuted, setIsMuted] = useState<boolean>(false)
@@ -52,9 +55,15 @@ export default function VideoPlayer() {
         
         // Check if we've reached the trim end point
         if (time >= clip.trimEnd) {
+          // Prevent double transitions
+          if (isTransitioningRef.current) {
+            return
+          }
+          
           // Move to next clip or stop playback
           if (currentClipIndex < timelineClips.length - 1) {
             console.log('[VideoPlayer] Transitioning to next clip:', currentClipIndex + 1)
+            isTransitioningRef.current = true
             loadClipAtIndex(currentClipIndex + 1, true) // Auto-play next clip
           } else {
             console.log('[VideoPlayer] Reached end of timeline')
@@ -73,9 +82,15 @@ export default function VideoPlayer() {
     
     // Register ended callback
     controllerRef.current.onEnded(() => {
+      // Prevent double transitions
+      if (isTransitioningRef.current) {
+        return
+      }
+      
       // Move to next clip or stop
       if (currentClipIndex < timelineClips.length - 1) {
         console.log('[VideoPlayer] Clip ended, loading next clip:', currentClipIndex + 1)
+        isTransitioningRef.current = true
         loadClipAtIndex(currentClipIndex + 1, true) // Auto-play next clip
       } else {
         console.log('[VideoPlayer] All clips finished')
@@ -127,6 +142,7 @@ export default function VideoPlayer() {
       }
       
       setIsLoading(false)
+      isTransitioningRef.current = false // Clear transition lock
       console.log('[VideoPlayer] Clip loaded successfully')
     } catch (err) {
       console.error('[VideoPlayer] Failed to load clip:', err, {
@@ -137,6 +153,7 @@ export default function VideoPlayer() {
       setError('Failed to load video clip')
       setIsLoading(false)
       setPlaying(false) // Stop playback on error
+      isTransitioningRef.current = false // Clear transition lock on error
     }
   }
 
