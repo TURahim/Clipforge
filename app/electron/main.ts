@@ -5,6 +5,15 @@ import { openFileDialog, validateVideoFile } from './handlers/file.handler'
 import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips, diagnoseFfmpeg } from './handlers/ffmpeg.handler'
 import type { TimelineClip } from '../src/types'
 
+// Safe logging wrapper to prevent EPIPE errors
+function safeLog(...args: any[]) {
+  try {
+    console.log(...args)
+  } catch (err) {
+    // Silently ignore EPIPE and other logging errors
+  }
+}
+
 // Register privileged schemes before app is ready
 protocol.registerSchemesAsPrivileged([
   {
@@ -20,7 +29,7 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 // Diagnostic logging for environment
-console.log('[Main] Environment check:', {
+safeLog('[Main] Environment check:', {
   NODE_ENV: process.env.NODE_ENV,
   VITE_DEV_SERVER_URL: process.env.VITE_DEV_SERVER_URL,
   ELECTRON_RENDERER_URL: process.env.ELECTRON_RENDERER_URL,
@@ -39,7 +48,7 @@ function createWindow() {
   const appPath = app.getAppPath()
   const resourcesPath = isDev ? __dirname : appPath
   
-  console.log('[Main] Paths:', {
+  safeLog('[Main] Paths:', {
     isDev,
     hasDevServer,
     __dirname,
@@ -54,8 +63,8 @@ function createWindow() {
     ? join(__dirname, '../preload/preload.cjs')
     : join(resourcesPath, 'out/preload/preload.cjs')
   
-  console.log('[Main] Preload path:', preloadPath)
-  console.log('[Main] Preload exists:', fs.existsSync(preloadPath))
+  safeLog('[Main] Preload path:', preloadPath)
+  safeLog('[Main] Preload exists:', fs.existsSync(preloadPath))
   
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -74,7 +83,7 @@ function createWindow() {
 
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
-    console.log('[Main] Window ready to show')
+    safeLog('[Main] Window ready to show')
     mainWindow?.show()
   })
 
@@ -109,7 +118,7 @@ function createWindow() {
   })
   
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[Main] Renderer finished loading')
+    safeLog('[Main] Renderer finished loading')
   })
 
   mainWindow.on('closed', () => {
@@ -219,7 +228,7 @@ function registerCustomProtocol() {
       const url = request.url
       const filePath = decodeURIComponent(url.replace('clipforge://video/', ''))
       
-      console.log('[Protocol] Serving video file:', filePath)
+      safeLog('[Protocol] Serving video file:', filePath)
       
       // Get file stats for Content-Length
       const fileStats = await stat(filePath)
@@ -242,7 +251,7 @@ function registerCustomProtocol() {
         const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
         const chunkSize = (end - start) + 1
         
-        console.log('[Protocol] Range request:', { start, end, chunkSize, fileSize })
+        safeLog('[Protocol] Range request:', { start, end, chunkSize, fileSize })
         
         // Read the requested chunk
         const fs = require('fs')
