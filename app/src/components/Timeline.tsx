@@ -308,7 +308,7 @@ export default function Timeline() {
                       // Allow both horizontal and vertical movement
                       // Constrain Y to valid track range (coordinates are relative to Group)
                       const minY = getTrackY(0)
-                      const maxY = getTrackY(NUM_TRACKS - 1)
+                      const maxY = getTrackY(NUM_TRACKS - 1) + TRACK_HEIGHT
                       // Constrain X to stay within timeline (don't allow negative)
                       const minX = 0
                       return {
