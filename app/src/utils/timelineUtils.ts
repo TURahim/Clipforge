@@ -32,7 +32,7 @@ export function safeDuration(c: { trimStart?: number; trimEnd?: number; duration
  */
 export function calculateClipWidth(duration: number): number {
   const safeDur = Number.isFinite(duration) ? Number(duration) : 0;
-  return Math.max(0, safeDur) * PIXELS_PER_SECOND;
+  return Math.max(0, safeDur) * BASE_PIXELS_PER_SECOND;
 }
 
 /**
@@ -66,14 +66,14 @@ export function calculateTotalDuration(clips: TimelineClip[]): number {
  * Convert pixels to seconds based on the timeline scale
  */
 export function pixelsToSeconds(pixels: number): number {
-  return pixels / PIXELS_PER_SECOND;
+  return pixels / BASE_PIXELS_PER_SECOND;
 }
 
 /**
  * Convert seconds to pixels based on the timeline scale
  */
 export function secondsToPixels(seconds: number): number {
-  return seconds * PIXELS_PER_SECOND;
+  return seconds * BASE_PIXELS_PER_SECOND;
 }
 
 /**
