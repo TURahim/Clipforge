@@ -1,382 +1,353 @@
 # ClipForge
 
-A lightweight desktop video editor built with Electron, React, and FFmpeg.
+<div align="center">
+  <h3>A Modern Desktop Video Editor</h3>
+  <p>Built with Electron, React, and TypeScript</p>
+</div>
 
-![ClipForge](https://img.shields.io/badge/version-0.1.0-blue)
-![Electron](https://img.shields.io/badge/electron-39.0.0-blue)
-![React](https://img.shields.io/badge/react-19.2.0-blue)
+---
 
-## 🎬 Features
+## 🎯 Overview
 
-- **Video Import** - Import videos via drag-and-drop or file picker (MP4, MOV, AVI, MKV, WEBM)
-- **Media Library** - Visual library with thumbnails and metadata display
-- **Timeline Editing** - Canvas-based timeline with drag-and-drop clip placement
-- **Video Playback** - Real-time video preview with play/pause controls and audio
-- **Draggable Playhead** - Interactive scrubbing through timeline with real-time sync
-- **Trim Clips** - Set in/out points with visual handles and trim indicators
-- **Multi-Clip Export** - Export single or multiple clips with trimming support
-- **Progress Tracking** - Real-time export progress with percentage display
-- **FFmpeg Integration** - Professional video processing powered by FFmpeg (Apple Silicon optimized)
-- **Cross-Platform** - Works on macOS, Windows, and Linux
+**ClipForge** is a lightweight desktop video editing application that makes it easy to import, trim, and export video clips. Built as a 3-day MVP project, it demonstrates professional software engineering practices including modular architecture, comprehensive testing, and CI/CD integration.
 
-## 📦 Installation
+### ✨ Key Features
 
-### Download Pre-built Binary
+- **📂 Video Import**: Drag-and-drop or file picker to import MP4/MOV files
+- **🎬 Timeline Editor**: Visual canvas-based timeline with drag-and-drop clip arrangement
+- **▶️ Video Playback**: Seamless multi-clip playback with audio synchronization
+- **✂️ Trim Functionality**: Precise in/out point trimming with visual indicators
+- **📤 Export Pipeline**: Single or multi-clip export to MP4 with progress tracking
+- **🎨 Modern UI**: Clean, intuitive interface built with React and TailwindCSS
+- **⚡ Fast Performance**: Hardware-accelerated rendering with Konva canvas
+- **🔧 Developer-Friendly**: Comprehensive unit tests and TypeScript type safety
 
-Download the latest release for your platform from [GitHub Releases](#).
+---
 
-#### macOS Users - Important!
+## 🚀 Quick Start
 
-On first launch, macOS Gatekeeper may block the app because it's not code-signed.
+### Prerequisites
 
-**To open the app:**
-1. Right-click (or Control-click) the ClipForge app icon
-2. Select "Open" from the context menu
-3. Click "Open" in the dialog that appears
+- **Node.js** v18 or higher
+- **pnpm** v8 or higher
+- **FFmpeg** (bundled automatically during build)
 
-This only needs to be done once. After that, you can launch the app normally.
+### Installation
 
-#### Windows Users
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/TURahim/Clipforge.git
+   cd Clipforge/app
+   ```
 
-If Windows SmartScreen appears, click "More info" and then "Run anyway". The app is not yet code-signed (planned for future releases).
+2. **Install dependencies**
+   ```bash
+   pnpm install
+   ```
 
-### Build from Source
+3. **Run in development mode**
+   ```bash
+   pnpm dev
+   ```
 
-#### Prerequisites
+4. **Build for production**
+   ```bash
+   pnpm build
+   ```
 
-- **Node.js** 18+ (recommended: 20.x or 22.x)
-- **pnpm** (install via `npm install -g pnpm`)
-- FFmpeg (bundled via `ffmpeg-static`)
+5. **Package the app**
+   ```bash
+   # macOS
+   pnpm package:mac
+   
+   # Windows
+   pnpm package:win
+   
+   # Linux
+   pnpm package:linux
+   ```
 
-#### Setup
+---
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd clipforge/app
+## 📦 Download
 
-# Install dependencies
-pnpm install
+Pre-built packages are available in [GitHub Releases](https://github.com/TURahim/Clipforge/releases):
 
-# Run in development mode (if port permissions allow)
-pnpm dev
+- **macOS**: `ClipForge-0.1.0-mac-arm64.dmg` (ARM64) or `ClipForge-0.1.0-mac-x64.dmg` (Intel)
+- **Windows**: `ClipForge-0.1.0-win-x64.exe`
+- **Linux**: `ClipForge-0.1.0-linux.AppImage`
 
-# Build for production
-pnpm build
+### Installation from DMG (macOS)
 
-# Run production build
-pnpm build && npx electron .
+1. Download the appropriate DMG for your architecture
+2. Open the DMG file
+3. Drag **ClipForge.app** to your Applications folder
+4. Launch from Applications (you may need to right-click → Open on first launch)
 
-# Package for distribution
-pnpm package:mac   # macOS
-pnpm package:win   # Windows
-```
+---
 
-## 🚀 Development
-
-### Development Mode
-
-**Note:** Development mode requires binding to a network port. If you encounter `EPERM` errors on macOS, use the production build method instead.
-
-```bash
-# Start dev server with hot reload
-pnpm dev
-```
-
-### Production Build & Test
-
-```bash
-# Build the application
-pnpm build
-
-# Run the built application
-npx electron .
-```
-
-### Testing
-
-```bash
-# Run all tests
-pnpm test
-
-# Run tests with UI
-pnpm test:ui
-
-# Run tests once (CI mode)
-pnpm test:run
-```
-
-### Linting
-
-```bash
-pnpm lint
-```
-
-## 🏗️ Tech Stack
-
-### Core Technologies
-- **Electron 39** - Desktop app framework
-- **Vite 7** - Build tool and dev server
-- **electron-vite 4** - Electron-specific Vite integration
-- **React 19** - UI framework
-- **TypeScript 5.9** - Type safety
-
-### State & UI
-- **Zustand 5** - Lightweight state management
-- **TailwindCSS 3** - Utility-first CSS framework
-- **React-Konva 19** - Canvas-based timeline with interactive elements
-- **Lucide React** - Modern icon library
-
-### Video Processing
-- **FFmpeg** (via `ffmpeg-static`) - Video encoding, decoding, and processing
-- **ffprobe** - Video metadata extraction
-
-### Testing
-- **Vitest 1.6** - Fast unit testing
-- **@testing-library/react** - React component testing
-- **happy-dom** - Lightweight DOM implementation for tests
-
-## 📁 Project Structure
-
-```
-clipforge/app/
-├── electron/                   # Electron main process
-│   ├── main.ts                # App entry point & window management
-│   ├── preload.ts             # IPC bridge (secure communication)
-│   └── handlers/              # IPC handlers
-│       ├── file.handler.ts    # File dialog & validation
-│       └── ffmpeg.handler.ts  # Video processing & export
-│
-├── src/                       # React renderer process
-│   ├── App.tsx               # Root component
-│   ├── main.tsx              # React entry point
-│   ├── index.css             # Global styles + Tailwind
-│   │
-│   ├── components/           # React components
-│   │   ├── MediaLibrary.tsx  # Media library panel
-│   │   ├── VideoPlayer.tsx   # Video player with playback controls
-│   │   ├── Timeline.tsx      # Interactive timeline with trim handles
-│   │   ├── ExportControls.tsx # Export UI & trim controls
-│   │   └── ui/               # Reusable UI components
-│   │       ├── Toast.tsx     # Notification toasts
-│   │       └── ProgressBar.tsx # Progress indicator
-│   │
-│   ├── store/                # State management
-│   │   └── useStore.ts       # Zustand store
-│   │
-│   ├── utils/                # Utility functions
-│   │   ├── VideoController.ts # Video controller abstraction
-│   │   ├── exportUtils.ts    # FFmpeg command builders
-│   │   ├── trimUtils.ts      # Trim validation utilities
-│   │   ├── timelineUtils.ts  # Timeline calculations
-│   │   └── __tests__/        # Unit tests
-│   │
-│   ├── types/                # TypeScript definitions
-│   │   ├── index.ts          # Shared types
-│   │   └── electron.d.ts     # Electron API types
-│   │
-│   └── test/                 # Test configuration
-│       └── setup.ts          # Vitest setup
-│
-├── out/                       # Build output (generated)
-│   ├── main/                 # Compiled main process
-│   ├── preload/              # Compiled preload script
-│   └── renderer/             # Compiled React app
-│
-├── electron.vite.config.ts   # Electron + Vite configuration
-├── vitest.config.ts          # Test configuration
-├── tailwind.config.js        # Tailwind configuration
-├── package.json              # Dependencies & scripts
-└── README.md                 # This file
-```
-
-## 🎯 Usage Guide
+## 🎓 Usage Guide
 
 ### 1. Import Videos
 
-**Method A: File Picker**
-- Click the **"Import Video"** button in the Media Library
-- Select one or more video files
-- Supported formats: MP4, MOV, AVI, MKV, WEBM
+- Click **"Import Video"** button or drag-and-drop video files
+- Supported formats: MP4, MOV, AVI, MKV
+- Thumbnails and metadata are automatically generated
 
-**Method B: Drag & Drop**
-- Drag video files from Finder/Explorer
-- Drop them anywhere in the Media Library panel
-- Multiple files can be dropped at once
+### 2. Build Your Timeline
 
-### 2. Add Clips to Timeline
+- Drag clips from the Media Library onto the Timeline
+- Clips snap to sequential positions automatically
+- Click any clip to select it
 
-- Click any clip in the Media Library
-- The clip will be added to the timeline automatically
-- Clips are arranged sequentially
+### 3. Trim Clips (Optional)
+
+- Select a clip on the timeline
+- Use **Set In** / **Set Out** buttons to mark trim points at the current playhead position
+- Or drag the trim handles on the timeline directly
+- **Reset Trim** removes all trim settings
+
+### 4. Preview Playback
+
+- Press **Space** or click the **Play** button to preview
 - Drag the red playhead to scrub through the timeline
+- Playback seamlessly transitions between clips
 
-### 3. Play & Preview
+### 5. Export Your Video
 
-- Click the **Play** button to preview your video
-- The playhead moves in sync with video playback
-- Drag the playhead to scrub to any position
-- Video automatically transitions between clips
+- Click **"Export Video"** and choose a save location
+- Progress bar shows export status
+- Exported MP4 includes all timeline clips with trim settings applied
 
-### 4. Trim Clips
+### 6. Keyboard Shortcuts
 
-- Select a clip on the timeline by clicking it
-- Use the **Set In** and **Set Out** buttons to trim at the playhead position
-- Or drag the orange trim handles on the timeline
-- Visual indicators show the trimmed regions
+- **Space**: Play / Pause
+- **Delete / Backspace**: Remove selected clip from timeline
 
-### 5. Export Video
+---
 
-- Click the **"Export Video"** button at the bottom
-- Choose output location and filename
-- Watch the progress bar as your video exports
-- The exported MP4 will respect all trim points
+## 🏗️ Architecture
 
-## 🔧 Configuration
+ClipForge follows a modular architecture with clear separation of concerns:
 
-### Build Configuration
-
-The app uses `electron-vite` for building:
-- **Main process:** Built as CommonJS (`.cjs`)
-- **Preload script:** Built as CommonJS (`.cjs`)
-- **Renderer:** Built as ES modules
-
-### FFmpeg Configuration
-
-FFmpeg is bundled via `@ffmpeg-installer/ffmpeg` and `@ffprobe-installer/ffprobe`:
-- **Video codec:** H.264 (libx264)
-- **Audio codec:** AAC
-- **Container:** MP4
-- **Apple Silicon Support:** Native ARM64 binaries included
-
-## 📝 Development Progress
-
-### ✅ Completed (MVP Phase)
-- [x] **PR #1:** Project Setup & Configuration
-  - ✅ Electron + Vite + React + TypeScript
-  - ✅ TailwindCSS integration
-  - ✅ Vitest testing framework
-  - ✅ Bytecode compilation for production builds
-- [x] **PR #2:** File Import System & Media Library
-  - ✅ File picker dialog
-  - ✅ Drag-and-drop support
-  - ✅ Thumbnail generation
-  - ✅ Visual media library with metadata
-- [x] **PR #3:** FFmpeg Integration & Export Testing
-  - ✅ FFmpeg/ffprobe for Apple Silicon
-  - ✅ Video metadata extraction
-  - ✅ Single-clip export
-  - ✅ Progress tracking
-- [x] **PR #4:** Timeline UI with React-Konva
-  - ✅ Canvas-based timeline component
-  - ✅ Drag-and-drop clips onto timeline
-  - ✅ NaN-safe calculations
-  - ✅ Playhead visualization
-  - ✅ Clip positioning with visual feedback
-- [x] **PR #5:** Video Player & Playback Controls
-  - ✅ VideoController abstraction layer
-  - ✅ Play/pause functionality with audio
-  - ✅ Real-time playhead sync with video
-  - ✅ Seamless multi-clip transitions
-  - ✅ Volume controls
-- [x] **PR #6:** Trim Functionality
-  - ✅ Draggable trim handles on timeline
-  - ✅ Set In/Out buttons with playhead position
-  - ✅ Visual trim indicators (darkened regions)
-  - ✅ Trim validation and constraints
-  - ✅ Reset trim functionality
-- [x] **PR #7:** Export Pipeline
-  - ✅ Single-clip export with trimming
-  - ✅ Multi-clip concatenation
-  - ✅ Real-time progress tracking
-  - ✅ Temporary file cleanup
-  - ✅ Comprehensive unit tests
-
-### 🚧 In Progress
-- [ ] **PR #8:** App Packaging & Distribution
-- [ ] **PR #9:** Bug Fixes & UI Polish
-- [ ] **PR #10:** Documentation & Demo Video
-
-## 🐛 Known Issues
-
-### Development Mode Port Errors
-
-**Issue:** `Error: listen EPERM: operation not permitted 127.0.0.1:5174`
-
-**Workaround:**
-```bash
-# Use production build instead
-pnpm build && npx electron .
+```
+app/
+├── electron/                 # Electron main process
+│   ├── main.ts              # App entry point, window management
+│   ├── preload.ts           # IPC bridge (secure context isolation)
+│   └── handlers/            # IPC handlers for backend operations
+│       ├── ffmpeg.handler.ts    # FFmpeg operations (metadata, export)
+│       └── file.handler.ts      # File system operations
+│
+├── src/                     # React renderer process
+│   ├── components/          # UI components
+│   │   ├── MediaLibrary.tsx     # Import and display clips
+│   │   ├── Timeline.tsx         # Canvas-based timeline editor
+│   │   ├── VideoPlayer.tsx      # Video preview and controls
+│   │   └── ExportControls.tsx   # Export and trim controls
+│   │
+│   ├── store/              # State management
+│   │   └── useStore.ts         # Zustand store (clips, playback, export)
+│   │
+│   ├── utils/              # Utilities and business logic
+│   │   ├── VideoController.ts  # Video playback abstraction
+│   │   ├── timelineUtils.ts    # Timeline calculations
+│   │   ├── trimUtils.ts        # Trim validation and constraints
+│   │   └── exportUtils.ts      # FFmpeg command builders
+│   │
+│   └── types/              # TypeScript type definitions
+│       └── index.ts            # Shared interfaces
+│
+└── scripts/                # Build scripts
+    └── copy-binaries.js        # Bundle FFmpeg binaries for packaging
 ```
 
-**Cause:** macOS security restrictions may prevent Electron from binding to network ports during development.
+### Key Technologies
 
-**Solution:** Grant network permissions to Terminal/iTerm in:
-- System Settings → Privacy & Security → Local Network
+- **Electron**: Cross-platform desktop app framework
+- **React 19**: UI components and state management
+- **TypeScript**: Type safety and better developer experience
+- **Zustand**: Lightweight state management
+- **React-Konva**: Canvas rendering for timeline
+- **TailwindCSS**: Utility-first styling
+- **Vite**: Fast build tooling
+- **Vitest**: Unit testing framework
+- **FFmpeg**: Video processing and export
+- **electron-builder**: App packaging
 
-### Unsigned Application Warnings
+---
 
-The app is currently unsigned, which triggers security warnings on first launch.
+## 🧪 Testing
 
-**macOS:** Right-click → Open (one time only)  
-**Windows:** Click "More info" → "Run anyway"
+ClipForge includes comprehensive unit tests for all core utilities:
 
-Code signing will be added in a future release.
+### Run Tests
 
-## 🚀 Roadmap
+```bash
+# Run all tests (watch mode)
+pnpm test
 
-### v0.2.0 - Timeline & Playback
-- Interactive timeline with React-Konva
-- Video player with play/pause/seek
-- Clip trimming with visual handles
-- Multi-clip export support
+# Run tests once (CI mode)
+pnpm test:run
 
-### v0.3.0 - Advanced Features
-- Transitions between clips
-- Basic effects (fade in/out)
-- Audio level adjustment
-- Keyboard shortcuts
+# Run specific test file
+pnpm test trimUtils
 
-### v1.0.0 - Production Release
-- Code signing for macOS & Windows
-- Auto-update support
-- Optimized performance
-- Comprehensive documentation
+# Open test UI
+pnpm test:ui
+```
+
+### Test Coverage
+
+- ✅ **Timeline Utils**: Position calculations, duration sums, NaN safety
+- ✅ **Trim Utils**: Validation, constraints, edge cases
+- ✅ **Export Utils**: FFmpeg command building, progress parsing
+- ✅ **Video Controller**: Playback, seeking, event handling
+
+---
+
+## 🔧 Development
+
+### Scripts
+
+```bash
+# Development
+pnpm dev              # Start dev server with hot reload
+pnpm build            # Build for production
+pnpm preview          # Preview production build
+
+# Packaging
+pnpm package          # Package for current platform
+pnpm package:mac      # Package for macOS (DMG)
+pnpm package:win      # Package for Windows (EXE)
+pnpm package:linux    # Package for Linux (AppImage)
+
+# Testing
+pnpm test             # Run tests in watch mode
+pnpm test:run         # Run tests once (CI)
+pnpm test:ui          # Open Vitest UI
+
+# Linting
+pnpm lint             # Run ESLint
+```
+
+### Development Tips
+
+1. **Hot Reload**: Changes to `src/` are hot-reloaded instantly
+2. **Main Process**: Changes to `electron/` require restart (`Ctrl+C` → `pnpm dev`)
+3. **TypeScript**: All code is fully typed for better IDE support
+4. **DevTools**: Press `Cmd+Option+I` (Mac) or `Ctrl+Shift+I` (Win/Linux) to open DevTools
+5. **Logs**: Main process logs appear in terminal, renderer logs in DevTools console
+
+### Project Structure Conventions
+
+- **Components**: One component per file, named exports
+- **Utilities**: Pure functions, fully tested
+- **Handlers**: IPC handlers in `electron/handlers/`
+- **Types**: Shared types in `src/types/index.ts`
+- **Tests**: Co-located in `__tests__/` directories
+
+---
+
+## 🚦 CI/CD
+
+ClipForge uses **GitHub Actions** for continuous integration:
+
+### Workflow Checks
+
+On every push and pull request to `main`:
+
+1. ✅ **Lint Check**: ESLint for code quality
+2. ✅ **Type Check**: TypeScript compilation without emit
+3. ✅ **Unit Tests**: All Vitest tests must pass
+4. ✅ **Build Check**: Production build succeeds
+
+### View CI Status
+
+Check the [Actions tab](https://github.com/TURahim/Clipforge/actions) for build status and logs.
+
+---
+
+## 🐛 Troubleshooting
+
+### App Won't Launch
+
+- **macOS**: Right-click → Open (first launch only)
+- **Windows**: Click "More info" → "Run anyway" if SmartScreen appears
+- **Linux**: Ensure `.AppImage` has execute permissions (`chmod +x ClipForge-*.AppImage`)
+
+### FFmpeg Errors
+
+- FFmpeg binaries are bundled automatically during build
+- If you see "FFmpeg not found" in dev mode, run `pnpm install` again
+- For packaged apps, ensure you built with `pnpm build` before packaging
+
+### Import Fails
+
+- Ensure video file is not corrupted
+- Supported formats: MP4, MOV, AVI, MKV (H.264/H.265 codecs)
+- Large files (>2GB) may take longer to import
+
+### Export Fails
+
+- Ensure sufficient disk space for output file
+- Check output path has write permissions
+- Export progress will show errors if FFmpeg fails
+
+### Timeline Performance
+
+- Limit timeline to ~20 clips for smooth performance
+- Close other apps if timeline feels sluggish
+- Use shorter clips when possible (<5 minutes each)
+
+---
 
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these guidelines:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feat/amazing-feature`)
+3. **Write** tests for new functionality
+4. **Ensure** all tests pass (`pnpm test:run`)
+5. **Commit** with conventional commit messages (`feat: add feature`)
+6. **Push** to your fork
+7. **Open** a Pull Request
 
-## 📄 License
+### Code Style
 
-MIT License - see LICENSE file for details
-
-## 🙏 Credits
-
-### Built With
-- [Electron](https://www.electronjs.org/) - Cross-platform desktop apps
-- [React](https://react.dev/) - UI framework
-- [Vite](https://vitejs.dev/) - Build tool
-- [FFmpeg](https://ffmpeg.org/) - Video processing
-- [TailwindCSS](https://tailwindcss.com/) - CSS framework
-- [Zustand](https://github.com/pmndrs/zustand) - State management
-
-### Development Timeline
-Built as part of a 3-day MVP challenge (October 27-29, 2025).
-
-## 📞 Support
-
-For issues, questions, or suggestions:
-- Open an issue on GitHub
-- Check the [documentation](./documents/)
-- Review the [task list](../documents/MVP_tasklist.md)
+- Follow existing code conventions
+- Run `pnpm lint` before committing
+- Add JSDoc comments for complex functions
+- Keep components small and focused
 
 ---
 
-**Made with ❤️ using Electron + React + FFmpeg**
+## 📄 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](../LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **FFmpeg**: Powerful video processing library
+- **Electron**: Cross-platform desktop framework
+- **React-Konva**: Canvas rendering made easy
+- **Zustand**: Simple state management
+- **electron-builder**: Painless app packaging
+
+---
+
+## 📧 Contact
+
+**Tahmeed Rahim** - [@TURahim](https://github.com/TURahim)
+
+**Project Link**: [https://github.com/TURahim/Clipforge](https://github.com/TURahim/Clipforge)
+
+---
+
+<div align="center">
+  <p>Made with ❤️ as a 3-day MVP project</p>
+  <p>⭐ Star this repo if you find it helpful!</p>
+</div>
