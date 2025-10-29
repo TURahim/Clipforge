@@ -17,18 +17,23 @@ function safeLog(...args: unknown[]) {
 }
 
 // Register privileged schemes before app is ready
-protocol.registerSchemesAsPrivileged([
-  {
-    scheme: 'clipforge',
-    privileges: {
-      standard: true,
-      secure: true,
-      supportFetchAPI: true,
-      corsEnabled: true,
-      stream: true, // Enable streaming for video
+// Wrap in try-catch for dev mode compatibility
+try {
+  protocol.registerSchemesAsPrivileged([
+    {
+      scheme: 'clipforge',
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        corsEnabled: true,
+        stream: true, // Enable streaming for video
+      },
     },
-  },
-])
+  ])
+} catch (error) {
+  safeLog('[Main] Protocol registration will be handled in app.whenReady')
+}
 
 // Diagnostic logging for environment
 safeLog('[Main] Environment check:', {
