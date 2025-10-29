@@ -3,6 +3,7 @@ import { Stage, Layer, Rect, Line, Text, Group } from 'react-konva'
 import type { KonvaEventObject } from 'konva/lib/Node'
 import { useStore } from '../store/useStore'
 import Toast from './ui/Toast'
+import { TimelineToolbar } from './TimelineToolbar'
 import {
   PIXELS_PER_SECOND,
   TIMELINE_HEIGHT,
@@ -135,11 +136,16 @@ export default function Timeline() {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={`h-full bg-gray-800 overflow-x-auto overflow-y-hidden ${
-        isDraggingOver ? 'ring-2 ring-blue-500 ring-inset' : ''
-      }`}
+    <div className="h-full flex flex-col bg-gray-800">
+      {/* Timeline Toolbar */}
+      <TimelineToolbar />
+      
+      {/* Timeline Canvas */}
+      <div
+        ref={containerRef}
+        className={`flex-1 overflow-x-auto overflow-y-hidden ${
+          isDraggingOver ? 'ring-2 ring-blue-500 ring-inset' : ''
+        }`}
       style={{ position: 'relative' }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -451,13 +457,14 @@ export default function Timeline() {
       )}
       
       {/* Toast Notification */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </div>
     </div>
   )
 }

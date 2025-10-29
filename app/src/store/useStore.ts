@@ -68,6 +68,8 @@ interface AppState {
   setPlaying: (isPlaying: boolean) => void
   updateClipTrim: (id: string, trimStart: number, trimEnd: number) => void
   setExportProgress: (progress: Partial<ExportProgress>) => void
+  splitClipAtPlayhead: (clipId: string) => void
+  deleteClip: (clipId: string) => void
 }
 
 const storeConfig: StateCreator<AppState> = (set) => ({
@@ -294,6 +296,86 @@ const storeConfig: StateCreator<AppState> = (set) => ({
     set((state) => ({
       exportProgress: { ...state.exportProgress, ...progress },
     })),
+  
+  // Split clip at playhead position
+  splitClipAtPlayhead: (clipId: string) =>
+    set((state) => {
+      const clip = state.timelineClips.find((c: TimelineClip) => c.id === clipId)
+      if (!clip) {
+        console.warn('[Store] Clip not found for split:', clipId)
+        return state
+      }
+      
+      // Calculate split point relative to clip start
+      const splitPoint = state.playheadPosition - clip.startTime
+      
+      // Validate split point is within the clip's effective duration
+      const effectiveDuration = clip.trimEnd - clip.trimStart
+      if (splitPoint <= 0 || splitPoint >= effectiveDuration) {
+        console.warn('[Store] Split point outside clip bounds:', splitPoint, effectiveDuration)
+        return state
+      }
+      
+      // Create two new clips
+      const timestamp = Date.now()
+      const clip1: TimelineClip = {
+        ...clip,
+        id: `${clip.id}-split1-${timestamp}`,
+        trimEnd: clip.trimStart + splitPoint,
+      }
+      
+      const clip2: TimelineClip = {
+        ...clip,
+        id: `${clip.id}-split2-${timestamp}`,
+        trimStart: clip.trimStart + splitPoint,
+        startTime: clip.startTime + splitPoint,
+      }
+      
+      // Replace original with two new clips
+      const newClips = state.timelineClips
+        .filter((c: TimelineClip) => c.id !== clipId)
+        .concat([clip1, clip2])
+        .sort((a, b) => a.startTime - b.startTime)
+      
+      console.log('[Store] Split clip:', { original: clip.id, clip1: clip1.id, clip2: clip2.id })
+      
+      return {
+        timelineClips: newClips,
+        selectedClipId: clip1.id, // Select first half
+      }
+    }),
+  
+  // Delete clip and close gap
+  deleteClip: (clipId: string) =>
+    set((state) => {
+      const deletedClip = state.timelineClips.find((c: TimelineClip) => c.id === clipId)
+      if (!deletedClip) {
+        console.warn('[Store] Clip not found for delete:', clipId)
+        return state
+      }
+      
+      const deletedDuration = deletedClip.trimEnd - deletedClip.trimStart
+      
+      // Remove the clip and shift remaining clips left
+      const remainingClips = state.timelineClips
+        .filter((c: TimelineClip) => c.id !== clipId)
+        .map((c: TimelineClip) => {
+          if (c.startTime > deletedClip.startTime) {
+            return {
+              ...c,
+              startTime: c.startTime - deletedDuration,
+            }
+          }
+          return c
+        })
+      
+      console.log('[Store] Deleted clip:', clipId, 'duration:', deletedDuration)
+      
+      return {
+        timelineClips: remainingClips,
+        selectedClipId: null,
+      }
+    }),
 })
 
 export const useStore = create<AppState>(storeConfig)

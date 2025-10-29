@@ -10,7 +10,8 @@ function App() {
   const isPlaying = useStore((state) => state.isPlaying)
   const setPlaying = useStore((state) => state.setPlaying)
   const selectedClipId = useStore((state) => state.selectedClipId)
-  const removeFromTimeline = useStore((state) => state.removeFromTimeline)
+  const deleteClip = useStore((state) => state.deleteClip)
+  const splitClipAtPlayhead = useStore((state) => state.splitClipAtPlayhead)
   
   // Keyboard shortcuts
   useEffect(() => {
@@ -26,16 +27,22 @@ function App() {
         setPlaying(!isPlaying)
       }
       
-      // Delete/Backspace = remove selected clip from timeline
+      // S = split clip at playhead
+      if ((e.code === 'KeyS') && selectedClipId) {
+        e.preventDefault()
+        splitClipAtPlayhead(selectedClipId)
+      }
+      
+      // Delete/Backspace = delete selected clip from timeline
       if ((e.code === 'Delete' || e.code === 'Backspace') && selectedClipId) {
         e.preventDefault()
-        removeFromTimeline(selectedClipId)
+        deleteClip(selectedClipId)
       }
     }
     
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [isPlaying, selectedClipId, setPlaying, removeFromTimeline])
+  }, [isPlaying, selectedClipId, setPlaying, splitClipAtPlayhead, deleteClip])
   
   return (
     <div className="h-screen bg-gray-900 text-white flex flex-col">
@@ -47,11 +54,12 @@ function App() {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-xs text-gray-500">
-            <span className="font-mono bg-gray-700 px-2 py-1 rounded">Space</span> Play/Pause • 
-            <span className="font-mono bg-gray-700 px-2 py-1 rounded ml-2">Del</span> Remove
+            <span className="font-mono bg-gray-700 px-2 py-1 rounded">Space</span> Play/Pause •
+            <span className="font-mono bg-gray-700 px-2 py-1 rounded ml-2">S</span> Split •
+            <span className="font-mono bg-gray-700 px-2 py-1 rounded ml-2">Del</span> Delete
           </div>
           <div className="text-sm text-gray-400">
-            PR #9: UI Polish ✓
+            PR #14: Timeline Operations ✓
           </div>
         </div>
       </header>
