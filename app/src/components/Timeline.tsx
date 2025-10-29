@@ -67,6 +67,7 @@ export default function Timeline() {
   const handleTimelineClick = (e: KonvaEventObject<MouseEvent>) => {
     // Click on timeline to move playhead
     const stage = e.target.getStage()
+    if (!stage) return
     const pointerPosition = stage.getPointerPosition()
     if (pointerPosition) {
       const seconds = pointerPosition.x / PIXELS_PER_SECOND

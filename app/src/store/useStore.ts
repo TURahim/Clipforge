@@ -102,7 +102,7 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       }
       
       // Sanitize numeric fields
-      const { duration } = sanitizeClipNumbers(clip)
+      const { duration } = sanitizeClipNumbers(clip as never)
       
       const sanitizedClip: Clip = {
         ...clip,
@@ -145,7 +145,7 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       }
       
       // Sanitize numeric fields with helper function
-      const { trimStart, trimEnd, duration } = sanitizeClipNumbers(incoming)
+      const { trimStart, trimEnd, duration } = sanitizeClipNumbers(incoming as never)
       
       console.log('[Store] Coerced values:', { trimStart, trimEnd, duration })
       

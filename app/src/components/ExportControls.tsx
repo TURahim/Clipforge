@@ -32,15 +32,16 @@ export default function ExportControls() {
       return
     }
 
-    const handleProgress = (data: {
-      percentage: number
-      currentTime: number
-      totalDuration: number
-    }) => {
+    const handleProgress = (data: unknown) => {
+      const progressData = data as {
+        percentage: number
+        currentTime: number
+        totalDuration: number
+      }
       setExportProgress({
-        percentage: data.percentage,
-        currentTime: data.currentTime,
-        totalDuration: data.totalDuration,
+        percentage: progressData.percentage,
+        currentTime: progressData.currentTime,
+        totalDuration: progressData.totalDuration,
       })
     }
 
@@ -65,7 +66,10 @@ export default function ExportControls() {
 
     try {
       // Show save dialog
-      const saveResult = await window.electron.invoke('save-file-dialog')
+      const saveResult = await window.electron.invoke('save-file-dialog') as {
+        success: boolean
+        filePath?: string
+      }
 
       if (!saveResult.success) {
         return // User canceled
@@ -86,7 +90,7 @@ export default function ExportControls() {
         'export-video',
         timelineClips,
         saveResult.filePath
-      )
+      ) as { success: boolean; error?: string }
 
       if (exportResult.success) {
         showToast('Export completed successfully!', 'success')
