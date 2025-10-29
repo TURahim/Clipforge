@@ -2,7 +2,7 @@
   "name": "clipforge",
   "private": true,
   "version": "0.1.0",
-  "main": "out/main/main.js",
+  "main": "out/main/main.cjs",
   "scripts": {
     "dev": "electron-vite dev",
     "prebuild": "node -e \"const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json'));pkg.main='out/main/main.cjs';fs.writeFileSync('package.json',JSON.stringify(pkg,null,2))\"",

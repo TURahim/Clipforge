@@ -36,3 +36,4 @@ fs.chmodSync(ffprobeDest, 0o755);
 
 console.log('✓ Binaries copied successfully');
 
+

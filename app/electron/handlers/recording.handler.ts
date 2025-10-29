@@ -63,3 +63,4 @@ export function setupRecordingHandlers() {
   console.log('[Recording] Recording handlers registered')
 }
 
+

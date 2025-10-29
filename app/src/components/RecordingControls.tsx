@@ -140,20 +140,31 @@ export function RecordingControls() {
       // Import the recording
       const result = await window.electron.invoke('import-video', filePath) as {
         success: boolean
-        clip?: {
+        data?: {
           filePath: string
-          filename: string
-          duration: number
-          width: number
-          height: number
+          metadata: {
+            duration: number
+            width: number
+            height: number
+          }
           thumbnail: string
         }
         error?: string
       }
       
-      if (result.success && result.clip) {
-        addClip(result.clip)
-        setSuccess(`Recording saved and imported: ${result.clip.filename}`)
+      if (result.success && result.data) {
+        // Create clip object matching the Clip interface
+        const clip = {
+          id: `clip-${Date.now()}`,
+          filePath: result.data.filePath,
+          filename: result.data.filePath.split('/').pop() || `${mode}-recording.webm`,
+          duration: result.data.metadata.duration,
+          thumbnail: result.data.thumbnail,
+          metadata: result.data.metadata,
+        }
+        
+        addClip(clip)
+        setSuccess(`Recording saved and imported: ${clip.filename}`)
       } else {
         throw new Error(result.error || 'Failed to import recording')
       }
