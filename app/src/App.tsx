@@ -97,7 +97,7 @@ function App() {
           </div>
 
           {/* Timeline */}
-          <div className="h-48 bg-gray-800 border-t border-gray-700 flex-shrink-0">
+          <div className="h-80 bg-gray-800 border-t border-gray-700 flex-shrink-0">
             <Timeline />
           </div>
 

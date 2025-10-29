@@ -40,7 +40,7 @@ export default function Timeline() {
   const containerRef = useRef<HTMLDivElement>(null)
   
   // Calculate canvas height based on number of tracks
-  const canvasHeight = NUM_TRACKS * (TRACK_HEIGHT + TRACK_GAP) + 40 // +40 for time markers at top
+  const canvasHeight = NUM_TRACKS * (TRACK_HEIGHT + TRACK_GAP) + 60 // +60 for time markers at top and extra spacing
   
   const [containerSize, setContainerSize] = useState({ width: 800, height: canvasHeight })
   const [isDraggingOver, setIsDraggingOver] = useState(false)
@@ -61,7 +61,7 @@ export default function Timeline() {
     updateSize()
     window.addEventListener('resize', updateSize)
     return () => window.removeEventListener('resize', updateSize)
-  }, [])
+  }, [canvasHeight])
 
   const totalDuration = calculateTotalDuration(timelineClips)
   const timelineWidth = Math.max(containerSize.width, secondsToPixels(totalDuration) + 200)
