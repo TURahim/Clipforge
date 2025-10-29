@@ -88,6 +88,7 @@ export default function VideoPlayer() {
   // Load clip at specific index
   const loadClipAtIndex = async (index: number, shouldAutoPlay: boolean = false) => {
     if (index < 0 || index >= timelineClips.length || !controllerRef.current) {
+      console.warn('[VideoPlayer] Cannot load clip - invalid index or no controller')
       return
     }
     
@@ -96,15 +97,28 @@ export default function VideoPlayer() {
     setError(null)
     
     try {
-      console.log('[VideoPlayer] Loading clip:', index, 'shouldAutoPlay:', shouldAutoPlay)
+      console.log('[VideoPlayer] Loading clip:', {
+        index,
+        filename: clip.filename,
+        filePath: clip.filePath,
+        trimStart: clip.trimStart,
+        trimEnd: clip.trimEnd,
+        shouldAutoPlay
+      })
       
       // Use custom clipforge:// protocol to serve local video files
       const videoUrl = `clipforge://video/${encodeURIComponent(clip.filePath)}`
       await controllerRef.current.load(videoUrl)
+      
+      console.log('[VideoPlayer] Video loaded, setting clip index and seeking to', clip.trimStart)
       setCurrentClipIndex(index)
+      
+      // Small delay to ensure video is truly ready for seeking
+      await new Promise(resolve => setTimeout(resolve, 50))
       
       // Seek to trim start point
       controllerRef.current.seek(clip.trimStart)
+      console.log('[VideoPlayer] Seeked to', clip.trimStart)
       
       // Resume playback if requested (for clip transitions)
       if (shouldAutoPlay && isPlayingRef.current) {
@@ -113,10 +127,16 @@ export default function VideoPlayer() {
       }
       
       setIsLoading(false)
+      console.log('[VideoPlayer] Clip loaded successfully')
     } catch (err) {
-      console.error('[VideoPlayer] Failed to load clip:', err)
+      console.error('[VideoPlayer] Failed to load clip:', err, {
+        index,
+        filename: clip.filename,
+        filePath: clip.filePath
+      })
       setError('Failed to load video clip')
       setIsLoading(false)
+      setPlaying(false) // Stop playback on error
     }
   }
 

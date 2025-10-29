@@ -31,27 +31,47 @@ export class VideoController {
   /**
    * Load video source
    * @param src - File path or URL
-   * @returns Promise that resolves when video metadata is loaded
+   * @returns Promise that resolves when video is ready to play
    */
   load(src: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Reset video element state
+      this.videoElement.pause()
+      this.videoElement.currentTime = 0
+      
+      // Set new source
       this.videoElement.src = src
       
-      const handleLoadedMetadata = () => {
-        this.videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      // Wait for canplay event (video is ready for seeking and playback)
+      const handleCanPlay = () => {
+        this.videoElement.removeEventListener('canplay', handleCanPlay)
         this.videoElement.removeEventListener('error', handleError)
+        this.videoElement.removeEventListener('abort', handleAbort)
         resolve()
       }
       
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const handleError = (_e: Event) => {
-        this.videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata)
+        this.videoElement.removeEventListener('canplay', handleCanPlay)
         this.videoElement.removeEventListener('error', handleError)
+        this.videoElement.removeEventListener('abort', handleAbort)
         reject(new Error('Failed to load video'))
       }
       
-      this.videoElement.addEventListener('loadedmetadata', handleLoadedMetadata)
-      this.videoElement.addEventListener('error', handleError)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const handleAbort = (_e: Event) => {
+        this.videoElement.removeEventListener('canplay', handleCanPlay)
+        this.videoElement.removeEventListener('error', handleError)
+        this.videoElement.removeEventListener('abort', handleAbort)
+        reject(new Error('Video load aborted'))
+      }
+      
+      this.videoElement.addEventListener('canplay', handleCanPlay, { once: true })
+      this.videoElement.addEventListener('error', handleError, { once: true })
+      this.videoElement.addEventListener('abort', handleAbort, { once: true })
+      
+      // Trigger load
+      this.videoElement.load()
     })
   }
 
