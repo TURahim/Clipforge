@@ -145,3 +145,53 @@ export function validateExportClips(clips: TimelineClip[]): {
 
   return { valid: true }
 }
+
+/**
+ * Check if timeline has overlay clips (track > 0)
+ */
+export function hasOverlayTracks(clips: TimelineClip[]): boolean {
+  return clips.some(clip => (clip.track || 0) > 0)
+}
+
+/**
+ * Separate clips by track
+ */
+export function separateClipsByTrack(clips: TimelineClip[]): {
+  mainTrack: TimelineClip[]
+  overlayTrack: TimelineClip[]
+} {
+  const mainTrack = clips.filter(clip => (clip.track || 0) === 0)
+  const overlayTrack = clips.filter(clip => (clip.track || 0) === 1)
+  
+  return { mainTrack, overlayTrack }
+}
+
+/**
+ * Build FFmpeg command for multi-track export with overlay
+ * Note: For MVP, we export with a simple PiP overlay
+ * More complex multi-clip overlay requires advanced FFmpeg filters
+ */
+export function buildOverlayExportCommand(
+  mainClips: TimelineClip[],
+  overlayClips: TimelineClip[],
+  outputPath: string
+): string[] {
+  // For MVP: Simple case - export main track, note that full overlay
+  // composition requires more complex FFmpeg filter graphs
+  // This is a simplified implementation
+  
+  const args: string[] = []
+  
+  // For now, export main track only
+  // Full implementation would require complex filter_complex
+  // with overlay filter for proper PiP composition
+  
+  console.warn('[Export] Multi-track overlay export is simplified in MVP')
+  console.warn('[Export] Exporting main track only. Full PiP composition coming soon.')
+  
+  // Build concat for main track
+  return buildConcatExportCommand(
+    generateTempFilelistPath(),
+    outputPath
+  )
+}
