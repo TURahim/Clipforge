@@ -284,6 +284,19 @@ export default function Timeline() {
                     onClick={() => handleClipClick(clip.id)}
                     onMouseEnter={() => setHoveredClipId(clip.id)}
                     onMouseLeave={() => setHoveredClipId(null)}
+                    draggable
+                    onDragEnd={(e: KonvaEventObject<DragEvent>) => {
+                      const newY = e.target.y()
+                      const newTrack = getTrackFromY(newY - 30) // -30 for Group offset
+                      
+                      if (newTrack !== clip.track) {
+                        console.log('[Timeline] Moving clip to track:', newTrack)
+                        updateClipTrack(clip.id, newTrack)
+                      }
+                      
+                      // Reset position after drag (we don't support horizontal dragging yet)
+                      e.target.position({ x: clipX + trimStartWidth, y: trackY })
+                    }}
                   />
 
                   {/* Trimmed-out region (right) - darkened */}
