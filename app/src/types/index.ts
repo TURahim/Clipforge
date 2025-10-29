@@ -13,6 +13,11 @@ export interface TimelineClip extends Clip {
   startTime: number // position on timeline (seconds)
   trimStart: number // trim in-point (seconds)
   trimEnd: number // trim out-point (seconds)
+  track: number // track number (0 = main, 1 = overlay)
+  
+  // For overlay positioning (used when track > 0)
+  position?: { x: number; y: number } // pixel position for overlay
+  scale?: number // scale factor for overlay (0.0 - 1.0)
 }
 
 // Video metadata from ffprobe

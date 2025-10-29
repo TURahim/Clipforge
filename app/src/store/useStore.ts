@@ -70,6 +70,8 @@ interface AppState {
   setExportProgress: (progress: Partial<ExportProgress>) => void
   splitClipAtPlayhead: (clipId: string) => void
   deleteClip: (clipId: string) => void
+  updateClipTrack: (clipId: string, track: number) => void
+  updateClipPosition: (clipId: string, position: { x: number; y: number }, scale?: number) => void
 }
 
 const storeConfig: StateCreator<AppState> = (set) => ({
@@ -171,6 +173,8 @@ const storeConfig: StateCreator<AppState> = (set) => ({
         trimStart: boundedTrimStart,
         trimEnd: boundedTrimEnd,
         duration,
+        track: 0, // Default to main track
+        scale: 1.0, // Default full size
       }
       
       console.log('[Store] New timeline clip created:', {
@@ -356,11 +360,12 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       
       const deletedDuration = deletedClip.trimEnd - deletedClip.trimStart
       
-      // Remove the clip and shift remaining clips left
+      // Remove the clip and shift remaining clips left ON THE SAME TRACK
       const remainingClips = state.timelineClips
         .filter((c: TimelineClip) => c.id !== clipId)
         .map((c: TimelineClip) => {
-          if (c.startTime > deletedClip.startTime) {
+          // Only shift clips on the same track that come after deleted clip
+          if (c.track === deletedClip.track && c.startTime > deletedClip.startTime) {
             return {
               ...c,
               startTime: c.startTime - deletedDuration,
@@ -375,6 +380,62 @@ const storeConfig: StateCreator<AppState> = (set) => ({
         timelineClips: remainingClips,
         selectedClipId: null,
       }
+    }),
+  
+  // Update clip track
+  updateClipTrack: (clipId: string, track: number) =>
+    set((state) => {
+      const clip = state.timelineClips.find((c: TimelineClip) => c.id === clipId)
+      if (!clip) {
+        console.warn('[Store] Clip not found for track update:', clipId)
+        return state
+      }
+      
+      // Constrain track to valid range (0-1)
+      const validTrack = Math.max(0, Math.min(1, track))
+      
+      const updatedClips = state.timelineClips.map((c: TimelineClip) => {
+        if (c.id === clipId) {
+          return {
+            ...c,
+            track: validTrack,
+            // Set default overlay position/scale if moving to overlay track
+            ...(validTrack === 1 && c.track === 0 ? {
+              position: c.position || { x: 20, y: 20 },
+              scale: c.scale || 0.25
+            } : {}),
+            // Reset position/scale if moving to main track
+            ...(validTrack === 0 && c.track === 1 ? {
+              position: undefined,
+              scale: 1.0
+            } : {})
+          }
+        }
+        return c
+      })
+      
+      console.log('[Store] Updated clip track:', clipId, 'to', validTrack)
+      
+      return { timelineClips: updatedClips }
+    }),
+  
+  // Update clip position and scale (for overlay track)
+  updateClipPosition: (clipId: string, position: { x: number; y: number }, scale?: number) =>
+    set((state) => {
+      const updatedClips = state.timelineClips.map((c: TimelineClip) => {
+        if (c.id === clipId) {
+          return {
+            ...c,
+            position,
+            ...(scale !== undefined ? { scale } : {})
+          }
+        }
+        return c
+      })
+      
+      console.log('[Store] Updated clip position:', clipId, position, scale)
+      
+      return { timelineClips: updatedClips }
     }),
 })
 
