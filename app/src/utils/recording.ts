@@ -129,6 +129,57 @@ export async function saveRecording(blob: Blob, filename: string): Promise<strin
 }
 
 /**
+ * Start both screen and webcam recording simultaneously (PiP)
+ */
+export async function startPiPRecording(screenSourceId: string): Promise<{
+  screenRecorder: MediaRecorder
+  webcamRecorder: MediaRecorder
+  webcamStream: MediaStream
+}> {
+  try {
+    // Start screen recording
+    const screenStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        // @ts-expect-error - chromeMediaSource is Electron-specific
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: screenSourceId,
+          minWidth: 1280,
+          maxWidth: 1920,
+          minHeight: 720,
+          maxHeight: 1080
+        }
+      }
+    })
+    
+    // Start webcam recording
+    const webcamStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: true
+    })
+    
+    const screenRecorder = new MediaRecorder(screenStream, {
+      mimeType: 'video/webm;codecs=vp9',
+      videoBitsPerSecond: 2500000
+    })
+    
+    const webcamRecorder = new MediaRecorder(webcamStream, {
+      mimeType: 'video/webm;codecs=vp9',
+      videoBitsPerSecond: 2500000
+    })
+    
+    return { screenRecorder, webcamRecorder, webcamStream }
+  } catch (error) {
+    console.error('[Recording] Failed to start PiP recording:', error)
+    throw error
+  }
+}
+
+/**
  * Format recording duration (seconds to MM:SS)
  */
 export function formatRecordingTime(seconds: number): string {

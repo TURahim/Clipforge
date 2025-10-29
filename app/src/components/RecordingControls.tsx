@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Monitor, Video, Circle, Square, Loader2 } from 'lucide-react'
+import { Monitor, Video, Circle, Square, Loader2, Combine } from 'lucide-react'
 import { SourcePicker } from './SourcePicker'
-import { startScreenRecording, startWebcamRecording, stopRecording, saveRecording, formatRecordingTime } from '../utils/recording'
+import { startScreenRecording, startWebcamRecording, startPiPRecording, stopRecording, saveRecording, formatRecordingTime } from '../utils/recording'
 import { useStore } from '../store/useStore'
 import Toast from './ui/Toast'
 
-type RecordingMode = 'screen' | 'webcam' | null
+type RecordingMode = 'screen' | 'webcam' | 'both' | null
 
 export function RecordingControls() {
   const { addClip } = useStore()
@@ -19,8 +19,10 @@ export function RecordingControls() {
   const [isProcessing, setIsProcessing] = useState(false)
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const secondRecorderRef = useRef<MediaRecorder | null>(null) // For PiP mode
   const webcamStreamRef = useRef<MediaStream | null>(null)
   const previewVideoRef = useRef<HTMLVideoElement>(null)
+  const screenPreviewVideoRef = useRef<HTMLVideoElement>(null)
   const timerIntervalRef = useRef<number | null>(null)
   
   // Update preview when webcam stream changes
@@ -61,6 +63,11 @@ export function RecordingControls() {
     setShowSourcePicker(true)
   }
   
+  const handleStartBothRecording = () => {
+    setMode('both')
+    setShowSourcePicker(true)
+  }
+  
   const handleStartWebcamRecording = async () => {
     try {
       setError(null)
@@ -96,15 +103,32 @@ export function RecordingControls() {
       setShowSourcePicker(false)
       setIsProcessing(true)
       
-      const mediaRecorder = await startScreenRecording(sourceId)
-      
-      mediaRecorderRef.current = mediaRecorder
-      
-      // Start recording
-      mediaRecorder.start()
-      setIsRecording(true)
-      startTimer()
-      setIsProcessing(false)
+      if (mode === 'both') {
+        // Start both screen and webcam recording (PiP)
+        const { screenRecorder, webcamRecorder, webcamStream } = await startPiPRecording(sourceId)
+        
+        mediaRecorderRef.current = screenRecorder
+        secondRecorderRef.current = webcamRecorder
+        webcamStreamRef.current = webcamStream
+        
+        // Start both recordings
+        screenRecorder.start()
+        webcamRecorder.start()
+        setIsRecording(true)
+        startTimer()
+        setIsProcessing(false)
+      } else {
+        // Start screen recording only
+        const mediaRecorder = await startScreenRecording(sourceId)
+        
+        mediaRecorderRef.current = mediaRecorder
+        
+        // Start recording
+        mediaRecorder.start()
+        setIsRecording(true)
+        startTimer()
+        setIsProcessing(false)
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to start screen recording'
       setError(errorMessage)
@@ -125,52 +149,119 @@ export function RecordingControls() {
       setIsProcessing(true)
       stopTimer()
       
-      const blob = await stopRecording(mediaRecorderRef.current)
-      
-      // Stop webcam stream if active
-      if (webcamStreamRef.current) {
-        webcamStreamRef.current.getTracks().forEach(track => track.stop())
-        webcamStreamRef.current = null
-      }
-      
-      // Save to disk
-      const filename = `${mode}-recording-${Date.now()}.webm`
-      const filePath = await saveRecording(blob, filename)
-      
-      // Import the recording
-      const result = await window.electron.invoke('import-video', filePath) as {
-        success: boolean
-        data?: {
-          filePath: string
-          metadata: {
-            duration: number
-            width: number
-            height: number
-          }
-          thumbnail: string
-        }
-        error?: string
-      }
-      
-      if (result.success && result.data) {
-        // Create clip object matching the Clip interface
-        const clip = {
-          id: `clip-${Date.now()}`,
-          filePath: result.data.filePath,
-          filename: result.data.filePath.split('/').pop() || `${mode}-recording.webm`,
-          duration: result.data.metadata.duration,
-          thumbnail: result.data.thumbnail,
-          metadata: result.data.metadata,
+      if (mode === 'both' && secondRecorderRef.current) {
+        // Stop both recordings (PiP mode)
+        const [screenBlob, webcamBlob] = await Promise.all([
+          stopRecording(mediaRecorderRef.current),
+          stopRecording(secondRecorderRef.current)
+        ])
+        
+        // Stop webcam stream
+        if (webcamStreamRef.current) {
+          webcamStreamRef.current.getTracks().forEach(track => track.stop())
+          webcamStreamRef.current = null
         }
         
-        addClip(clip)
-        setSuccess(`Recording saved and imported: ${clip.filename}`)
+        const timestamp = Date.now()
+        
+        // Save both recordings
+        const screenFilePath = await saveRecording(screenBlob, `screen-recording-${timestamp}.webm`)
+        const webcamFilePath = await saveRecording(webcamBlob, `webcam-recording-${timestamp}.webm`)
+        
+        // Import both recordings
+        const [screenResult, webcamResult] = await Promise.all([
+          window.electron.invoke('import-video', screenFilePath),
+          window.electron.invoke('import-video', webcamFilePath)
+        ]) as Array<{
+          success: boolean
+          data?: {
+            filePath: string
+            metadata: { duration: number; width: number; height: number }
+            thumbnail: string
+          }
+          error?: string
+        }>
+        
+        // Add both clips
+        if (screenResult.success && screenResult.data) {
+          const screenClip = {
+            id: `clip-${timestamp}-screen`,
+            filePath: screenResult.data.filePath,
+            filename: screenResult.data.filePath.split('/').pop() || 'screen-recording.webm',
+            duration: screenResult.data.metadata.duration,
+            thumbnail: screenResult.data.thumbnail,
+            metadata: screenResult.data.metadata,
+          }
+          addClip(screenClip)
+        }
+        
+        if (webcamResult.success && webcamResult.data) {
+          const webcamClip = {
+            id: `clip-${timestamp}-webcam`,
+            filePath: webcamResult.data.filePath,
+            filename: webcamResult.data.filePath.split('/').pop() || 'webcam-recording.webm',
+            duration: webcamResult.data.metadata.duration,
+            thumbnail: webcamResult.data.thumbnail,
+            metadata: webcamResult.data.metadata,
+          }
+          addClip(webcamClip)
+        }
+        
+        setSuccess('Screen and webcam recordings saved! Drag them to the timeline for PiP editing.')
+        
+        // Reset state
+        mediaRecorderRef.current = null
+        secondRecorderRef.current = null
       } else {
-        throw new Error(result.error || 'Failed to import recording')
+        // Single recording (screen or webcam)
+        const blob = await stopRecording(mediaRecorderRef.current)
+        
+        // Stop webcam stream if active
+        if (webcamStreamRef.current) {
+          webcamStreamRef.current.getTracks().forEach(track => track.stop())
+          webcamStreamRef.current = null
+        }
+        
+        // Save to disk
+        const filename = `${mode}-recording-${Date.now()}.webm`
+        const filePath = await saveRecording(blob, filename)
+        
+        // Import the recording
+        const result = await window.electron.invoke('import-video', filePath) as {
+          success: boolean
+          data?: {
+            filePath: string
+            metadata: {
+              duration: number
+              width: number
+              height: number
+            }
+            thumbnail: string
+          }
+          error?: string
+        }
+        
+        if (result.success && result.data) {
+          // Create clip object matching the Clip interface
+          const clip = {
+            id: `clip-${Date.now()}`,
+            filePath: result.data.filePath,
+            filename: result.data.filePath.split('/').pop() || `${mode}-recording.webm`,
+            duration: result.data.metadata.duration,
+            thumbnail: result.data.thumbnail,
+            metadata: result.data.metadata,
+          }
+          
+          addClip(clip)
+          setSuccess(`Recording saved and imported: ${clip.filename}`)
+        } else {
+          throw new Error(result.error || 'Failed to import recording')
+        }
+        
+        // Reset state
+        mediaRecorderRef.current = null
       }
       
-      // Reset state
-      mediaRecorderRef.current = null
       setIsRecording(false)
       setMode(null)
       setRecordingTime(0)
@@ -214,6 +305,15 @@ export function RecordingControls() {
                   <Video className="w-5 h-5" />
                   <span>Webcam</span>
                 </button>
+                
+                <button
+                  onClick={handleStartBothRecording}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition"
+                  title="Record screen and webcam simultaneously (PiP)"
+                >
+                  <Combine className="w-5 h-5" />
+                  <span>Both (PiP)</span>
+                </button>
               </>
             )}
             
@@ -247,7 +347,7 @@ export function RecordingControls() {
             )}
           </div>
           
-          {/* Webcam preview */}
+          {/* Preview section */}
           {mode === 'webcam' && webcamStreamRef.current && (
             <div className="relative">
               <video
@@ -259,6 +359,30 @@ export function RecordingControls() {
               {isRecording && (
                 <div className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
               )}
+            </div>
+          )}
+          
+          {/* Both mode previews */}
+          {mode === 'both' && webcamStreamRef.current && (
+            <div className="flex gap-3 items-center">
+              <div className="text-gray-400 text-sm">
+                <Monitor className="w-4 h-4 inline mr-1" />
+                Screen
+              </div>
+              <div className="relative">
+                <video
+                  ref={previewVideoRef}
+                  autoPlay
+                  muted
+                  className="w-40 h-24 bg-black rounded border border-gray-600"
+                />
+                {isRecording && (
+                  <div className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                )}
+                <div className="absolute bottom-1 left-1 text-xs text-white bg-black/70 px-2 py-0.5 rounded">
+                  Webcam
+                </div>
+              </div>
             </div>
           )}
         </div>
