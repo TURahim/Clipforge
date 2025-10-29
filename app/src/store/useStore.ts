@@ -75,6 +75,7 @@ interface AppState {
   splitClipAtPlayhead: (clipId: string) => void
   deleteClip: (clipId: string) => void
   updateClipTrack: (clipId: string, track: number) => void
+  updateClipStartTime: (clipId: string, startTime: number) => void
   updateClipPosition: (clipId: string, position: { x: number; y: number }, scale?: number) => void
   setZoomLevel: (level: number) => void
   zoomIn: () => void
@@ -430,6 +431,30 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       })
       
       console.log('[Store] Updated clip track:', clipId, 'to', validTrack)
+      
+      return { timelineClips: updatedClips }
+    }),
+  
+  // Update clip startTime (for horizontal repositioning)
+  updateClipStartTime: (clipId: string, startTime: number) =>
+    set((state) => {
+      const updatedClips = state.timelineClips.map((c: TimelineClip) => {
+        if (c.id === clipId) {
+          return {
+            ...c,
+            startTime: Math.max(0, startTime) // Ensure startTime is not negative
+          }
+        }
+        return c
+      })
+      
+      // Sort clips by startTime and track
+      updatedClips.sort((a, b) => {
+        if (a.track !== b.track) return a.track - b.track
+        return a.startTime - b.startTime
+      })
+      
+      console.log('[Store] Updated clip startTime:', clipId, 'to', startTime)
       
       return { timelineClips: updatedClips }
     }),

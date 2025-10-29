@@ -9,7 +9,6 @@ import {
   TRACK_HEIGHT,
   TRACK_GAP,
   NUM_TRACKS,
-  calculateClipPosition,
   calculateTotalDuration,
   formatTime,
   generateTimeMarkers,
@@ -29,6 +28,7 @@ export default function Timeline() {
   const addToTimeline = useStore((state) => state.addToTimeline)
   const updateClipTrim = useStore((state) => state.updateClipTrim)
   const updateClipTrack = useStore((state) => state.updateClipTrack)
+  const updateClipStartTime = useStore((state) => state.updateClipStartTime)
   
   // Calculate effective pixels per second based on zoom level
   const PIXELS_PER_SECOND = getEffectivePPS(zoomLevel)
@@ -258,10 +258,8 @@ export default function Timeline() {
             
             {/* Render clips on their respective tracks */}
             {timelineClips.map((clip) => {
-              // Calculate clip position within its track
-              const clipsOnSameTrack = timelineClips.filter(c => c.track === clip.track)
-              const indexInTrack = clipsOnSameTrack.findIndex(c => c.id === clip.id)
-              const clipX = calculateClipPosition(clipsOnSameTrack, indexInTrack)
+              // Calculate clip X position based on startTime
+              const clipX = clip.startTime * PIXELS_PER_SECOND
               
               // Calculate Y position based on track
               const trackY = getTrackY(clip.track || 0)
@@ -307,34 +305,52 @@ export default function Timeline() {
                     onMouseLeave={() => setHoveredClipId(null)}
                     draggable
                     dragBoundFunc={(pos) => {
-                      // Allow vertical movement between tracks, but keep horizontal position
+                      // Allow both horizontal and vertical movement
                       // Constrain Y to valid track range (coordinates are relative to Group)
                       const minY = getTrackY(0)
                       const maxY = getTrackY(NUM_TRACKS - 1)
+                      // Constrain X to stay within timeline (don't allow negative)
+                      const minX = 0
                       return {
-                        x: clipX + trimStartWidth,
+                        x: Math.max(minX, pos.x),
                         y: Math.max(minY, Math.min(maxY, pos.y))
                       }
                     }}
                     onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-                      // Y position is relative to Group (not Stage)
-                      const groupRelativeY = e.target.y()
-                      const newTrack = getTrackFromY(groupRelativeY)
+                      // Get new position (relative to Group)
+                      const newX = e.target.x()
+                      const newY = e.target.y()
+                      
+                      // Calculate new track
+                      const newTrack = getTrackFromY(newY)
+                      
+                      // Calculate new startTime from X position (accounting for trimStartWidth offset)
+                      const newStartTime = (newX - trimStartWidth) / PIXELS_PER_SECOND
                       
                       console.log('[Timeline] Drag ended:', {
-                        groupRelativeY,
-                        currentTrack: clip.track,
-                        newTrack
+                        newX,
+                        newY,
+                        newStartTime,
+                        newTrack,
+                        currentTrack: clip.track
                       })
                       
+                      // Update track if changed
                       if (newTrack !== clip.track) {
                         console.log('[Timeline] Moving clip from track', clip.track, 'to track', newTrack)
                         updateClipTrack(clip.id, newTrack)
                       }
                       
-                      // Snap to correct track position (relative to Group)
+                      // Update startTime if changed
+                      if (Math.abs(newStartTime - clip.startTime) > 0.01) {
+                        console.log('[Timeline] Moving clip from', clip.startTime, 'to', newStartTime)
+                        updateClipStartTime(clip.id, newStartTime)
+                      }
+                      
+                      // Snap to correct position
                       const targetTrackY = getTrackY(newTrack)
-                      e.target.position({ x: clipX + trimStartWidth, y: targetTrackY })
+                      const targetX = Math.max(0, newStartTime) * PIXELS_PER_SECOND + trimStartWidth
+                      e.target.position({ x: targetX, y: targetTrackY })
                     }}
                     onMouseDown={(e) => {
                       const container = e.target.getStage()?.container()
