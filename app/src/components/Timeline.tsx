@@ -201,31 +201,54 @@ export default function Timeline() {
             )
           })}
 
-          {/* Timeline clips track */}
-          <Group y={40}>
-            {timelineClips.map((clip, index) => {
-              const clipX = calculateClipPosition(timelineClips, index)
+          {/* Multi-Track Timeline */}
+          <Group y={30}>
+            {/* Render track backgrounds and labels */}
+            {Array.from({ length: NUM_TRACKS }).map((_, trackIndex) => {
+              const trackY = getTrackY(trackIndex)
+              const trackLabel = trackIndex === 0 ? 'Main Track' : 'Overlay Track'
+              const trackColor = trackIndex === 0 ? '#1f2937' : '#111827'
+              
+              return (
+                <Group key={`track-${trackIndex}`}>
+                  {/* Track background */}
+                  <Rect
+                    x={0}
+                    y={trackY}
+                    width={timelineWidth}
+                    height={TRACK_HEIGHT}
+                    fill={trackColor}
+                    stroke="#374151"
+                    strokeWidth={1}
+                  />
+                  
+                  {/* Track label */}
+                  <Text
+                    x={10}
+                    y={trackY + 8}
+                    text={trackLabel}
+                    fontSize={11}
+                    fill="#6b7280"
+                    fontStyle="bold"
+                  />
+                </Group>
+              )
+            })}
+            
+            {/* Render clips on their respective tracks */}
+            {timelineClips.map((clip) => {
+              // Calculate clip position within its track
+              const clipsOnSameTrack = timelineClips.filter(c => c.track === clip.track)
+              const indexInTrack = clipsOnSameTrack.findIndex(c => c.id === clip.id)
+              const clipX = calculateClipPosition(clipsOnSameTrack, indexInTrack)
+              
+              // Calculate Y position based on track
+              const trackY = getTrackY(clip.track || 0)
+              
               // NaN-safe width calculation
               const clipWidth = Math.max(0, (Number(clip.trimEnd) - Number(clip.trimStart))) * PIXELS_PER_SECOND
               const isSelected = clip.id === selectedClipId
               
-              // Diagnostic logging for clip rendering
-              if (index === timelineClips.length - 1) {
-                // Log last clip only to avoid spam
-                console.log('[Timeline Render] Last clip:', {
-                  filename: clip.filename,
-                  clipX,
-                  clipWidth,
-                  trimStart: clip.trimStart,
-                  trimEnd: clip.trimEnd,
-                  isValid: Number.isFinite(clipX) && Number.isFinite(clipWidth) && clipWidth > 0,
-                })
-                
-                if (!Number.isFinite(clipX) || !Number.isFinite(clipWidth) || clipWidth <= 0) {
-                  console.warn('[Timeline Render] ⚠️ Invalid clip dimensions detected!')
-                }
-              }
-
               const totalClipWidth = clip.duration * PIXELS_PER_SECOND
               const trimStartWidth = clip.trimStart * PIXELS_PER_SECOND
               const trimEndWidth = (clip.duration - clip.trimEnd) * PIXELS_PER_SECOND
@@ -236,9 +259,9 @@ export default function Timeline() {
                   {clip.trimStart > 0 && (
                     <Rect
                       x={clipX}
-                      y={0}
+                      y={trackY}
                       width={trimStartWidth}
-                      height={TIMELINE_HEIGHT}
+                      height={TRACK_HEIGHT}
                       fill="rgba(0,0,0,0.6)"
                       cornerRadius={4}
                       onClick={() => handleClipClick(clip.id)}
@@ -248,9 +271,9 @@ export default function Timeline() {
                   {/* Active/visible region */}
                   <Rect
                     x={clipX + trimStartWidth}
-                    y={0}
+                    y={trackY}
                     width={clipWidth}
-                    height={TIMELINE_HEIGHT}
+                    height={TRACK_HEIGHT}
                     fill={isSelected ? '#3b82f6' : (hoveredClipId === clip.id ? '#5A9FE2' : '#4a90e2')}
                     stroke={isSelected ? '#60a5fa' : '#10b981'}
                     strokeWidth={isSelected ? 3 : 2}
@@ -267,9 +290,9 @@ export default function Timeline() {
                   {clip.trimEnd < clip.duration && (
                     <Rect
                       x={clipX + trimStartWidth + clipWidth}
-                      y={0}
+                      y={trackY}
                       width={trimEndWidth}
-                      height={TIMELINE_HEIGHT}
+                      height={TRACK_HEIGHT}
                       fill="rgba(0,0,0,0.6)"
                       cornerRadius={4}
                       onClick={() => handleClipClick(clip.id)}
@@ -280,9 +303,9 @@ export default function Timeline() {
                   {isSelected && (
                     <Rect
                       x={clipX + trimStartWidth - 5}
-                      y={0}
+                      y={trackY}
                       width={10}
-                      height={TIMELINE_HEIGHT}
+                      height={TRACK_HEIGHT}
                       fill="#FFA500"
                       cornerRadius={2}
                       draggable
@@ -292,7 +315,7 @@ export default function Timeline() {
                         const maxX = clipX + trimStartWidth + clipWidth - 10
                         return {
                           x: Math.max(minX, Math.min(maxX, pos.x)),
-                          y: 40, // Keep on same y level
+                          y: trackY + 30, // Keep on same y level relative to track
                         }
                       }}
                       onDragEnd={(e: KonvaEventObject<DragEvent>) => {
@@ -316,9 +339,9 @@ export default function Timeline() {
                   {isSelected && (
                     <Rect
                       x={clipX + trimStartWidth + clipWidth - 5}
-                      y={0}
+                      y={trackY}
                       width={10}
-                      height={TIMELINE_HEIGHT}
+                      height={TRACK_HEIGHT}
                       fill="#FFA500"
                       cornerRadius={2}
                       draggable
@@ -327,7 +350,7 @@ export default function Timeline() {
                         const maxX = clipX + totalClipWidth
                         return {
                           x: Math.max(minX, Math.min(maxX, pos.x)),
-                          y: 40,
+                          y: trackY + 30,
                         }
                       }}
                       onDragEnd={(e: KonvaEventObject<DragEvent>) => {
@@ -350,9 +373,9 @@ export default function Timeline() {
                   {/* Clip label */}
                   <Text
                     x={clipX + trimStartWidth + 10}
-                    y={10}
+                    y={trackY + 25}
                     text={clip.filename}
-                    fontSize={14}
+                    fontSize={12}
                     fill="white"
                     width={Math.max(0, clipWidth - 20)}
                     ellipsis={true}
@@ -362,9 +385,9 @@ export default function Timeline() {
                   {/* Duration label */}
                   <Text
                     x={clipX + trimStartWidth + 10}
-                    y={TIMELINE_HEIGHT - 25}
+                    y={trackY + TRACK_HEIGHT - 15}
                     text={formatTime(Number(clip.trimEnd) - Number(clip.trimStart))}
-                    fontSize={12}
+                    fontSize={10}
                     fill="#e5e7eb"
                     onClick={() => handleClipClick(clip.id)}
                   />
