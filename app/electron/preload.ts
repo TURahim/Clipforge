@@ -4,7 +4,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electron', {
   // IPC communication methods
-  send: (channel: string, data: any) => {
+  send: (channel: string, data: unknown) => {
     // Whitelist channels
     const validChannels = [
       'import-video',
@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('electron', {
     }
   },
   
-  on: (channel: string, callback: (data: any) => void) => {
+  on: (channel: string, callback: (data: unknown) => void) => {
     const validChannels = [
       'import-video-complete',
       'export-progress',
@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld('electron', {
     }
   },
   
-  once: (channel: string, callback: (data: any) => void) => {
+  once: (channel: string, callback: (data: unknown) => void) => {
     const validChannels = [
       'import-video-complete',
       'export-complete',
@@ -40,7 +40,7 @@ contextBridge.exposeInMainWorld('electron', {
     }
   },
   
-  invoke: async (channel: string, ...args: any[]) => {
+  invoke: async (channel: string, ...args: unknown[]) => {
     const validChannels = [
       'import-video',
       'export-video',
@@ -54,7 +54,7 @@ contextBridge.exposeInMainWorld('electron', {
     }
   },
   
-  removeListener: (channel: string, callback: (...args: any[]) => void) => {
+  removeListener: (channel: string, callback: (...args: unknown[]) => void) => {
     const validChannels = [
       'import-video-complete',
       'export-progress',
@@ -71,11 +71,11 @@ contextBridge.exposeInMainWorld('electron', {
 declare global {
   interface Window {
     electron: {
-      send: (channel: string, data: any) => void
-      on: (channel: string, callback: (data: any) => void) => void
-      once: (channel: string, callback: (data: any) => void) => void
-      invoke: (channel: string, data?: any) => Promise<any>
-      removeListener: (channel: string, callback: (...args: any[]) => void) => void
+      send: (channel: string, data: unknown) => void
+      on: (channel: string, callback: (data: unknown) => void) => void
+      once: (channel: string, callback: (data: unknown) => void) => void
+      invoke: (channel: string, data?: unknown) => Promise<unknown>
+      removeListener: (channel: string, callback: (...args: unknown[]) => void) => void
     }
   }
 }

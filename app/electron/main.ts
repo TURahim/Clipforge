@@ -6,10 +6,11 @@ import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleCli
 import type { TimelineClip } from '../src/types'
 
 // Safe logging wrapper to prevent EPIPE errors
-function safeLog(...args: any[]) {
+function safeLog(...args: unknown[]) {
   try {
     console.log(...args)
-  } catch (err) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  } catch (_err) {
     // Silently ignore EPIPE and other logging errors
   }
 }
@@ -58,6 +59,7 @@ function createWindow() {
   })
   
   // Preload path: Always use .cjs now (bytecode disabled for preload)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require('fs')
   const preloadPath = isDev 
     ? join(__dirname, '../preload/preload.cjs')
@@ -254,6 +256,7 @@ function registerCustomProtocol() {
         safeLog('[Protocol] Range request:', { start, end, chunkSize, fileSize })
         
         // Read the requested chunk
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const fs = require('fs')
         const stream = fs.createReadStream(filePath, { start, end })
         

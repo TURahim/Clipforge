@@ -24,7 +24,7 @@ describe('timelineUtils - NaN-safe functions', () => {
     })
 
     it('should handle completely missing trim values (use duration)', () => {
-      const clip = { duration: 30 }
+      const clip = { duration: 30 } as { duration: number; trimStart?: number; trimEnd?: number }
       expect(safeDuration(clip)).toBe(30)
     })
 
@@ -44,7 +44,7 @@ describe('timelineUtils - NaN-safe functions', () => {
     })
 
     it('should return 0 when all values are missing', () => {
-      const clip = {}
+      const clip = {} as { duration?: number; trimStart?: number; trimEnd?: number }
       expect(safeDuration(clip)).toBe(0)
     })
 
@@ -70,7 +70,7 @@ describe('timelineUtils - NaN-safe functions', () => {
     })
 
     it('should handle undefined duration', () => {
-      expect(calculateClipWidth(undefined as any)).toBe(0)
+      expect(calculateClipWidth(undefined as unknown as number)).toBe(0)
     })
 
     it('should handle negative duration (return 0)', () => {

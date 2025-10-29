@@ -10,22 +10,22 @@ class MockVideoElement {
   ended = false
   volume = 1
   
-  private listeners: { [key: string]: Function[] } = {}
+  private listeners: { [key: string]: ((data?: unknown) => void)[] } = {}
   
-  addEventListener(event: string, handler: Function) {
+  addEventListener(event: string, handler: (data?: unknown) => void) {
     if (!this.listeners[event]) {
       this.listeners[event] = []
     }
     this.listeners[event].push(handler)
   }
   
-  removeEventListener(event: string, handler: Function) {
+  removeEventListener(event: string, handler: (data?: unknown) => void) {
     if (this.listeners[event]) {
       this.listeners[event] = this.listeners[event].filter(h => h !== handler)
     }
   }
   
-  trigger(event: string, data?: any) {
+  trigger(event: string, data?: unknown) {
     if (this.listeners[event]) {
       this.listeners[event].forEach(handler => handler(data))
     }
@@ -47,7 +47,7 @@ describe('VideoController', () => {
   
   beforeEach(() => {
     videoElement = new MockVideoElement()
-    controller = new VideoController(videoElement as any)
+    controller = new VideoController(videoElement as unknown as HTMLVideoElement)
   })
   
   describe('load', () => {

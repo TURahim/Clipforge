@@ -57,14 +57,14 @@ export default function Timeline() {
     setSelectedClip(clipId)
   }
 
-  const handleStageClick = (e: any) => {
+  const handleStageClick = (e: KonvaEventObject<MouseEvent>) => {
     // Deselect if clicking on empty area
     if (e.target === e.target.getStage()) {
       setSelectedClip(null)
     }
   }
 
-  const handleTimelineClick = (e: any) => {
+  const handleTimelineClick = (e: KonvaEventObject<MouseEvent>) => {
     // Click on timeline to move playhead
     const stage = e.target.getStage()
     const pointerPosition = stage.getPointerPosition()
@@ -148,9 +148,9 @@ export default function Timeline() {
         width={Math.max(containerSize.width, timelineWidth)} 
         height={containerSize.height} 
         onClick={handleStageClick}
-        onDrop={handleDrop as any}
-        onDragOver={handleDragOver as any}
-        onDragLeave={handleDragLeave as any}
+        onDrop={handleDrop as unknown as (e: KonvaEventObject<DragEvent>) => void}
+        onDragOver={handleDragOver as unknown as (e: KonvaEventObject<DragEvent>) => void}
+        onDragLeave={handleDragLeave as unknown as (e: KonvaEventObject<DragEvent>) => void}
       >
         <Layer>
           {/* Timeline background */}

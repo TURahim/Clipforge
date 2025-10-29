@@ -43,7 +43,8 @@ export class VideoController {
         resolve()
       }
       
-      const handleError = (e: Event) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const handleError = (_e: Event) => {
         this.videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata)
         this.videoElement.removeEventListener('error', handleError)
         reject(new Error('Failed to load video'))

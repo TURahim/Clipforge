@@ -20,7 +20,9 @@ function getBinaryPaths(): { ffmpegPath: string; ffprobePath: string } {
     // Development mode: Use @ffmpeg-installer and @ffprobe-installer
     try {
       // These installer packages export the path directly
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg')
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const ffprobeInstaller = require('@ffprobe-installer/ffprobe')
       
       ffmpegPath = ffmpegInstaller.path
@@ -457,7 +459,8 @@ export async function exportMultipleClips(
         if (!trimResult.success) {
           // Clean up any created temp files
           tempFiles.forEach(f => {
-            try { unlinkSync(f) } catch (e) { /* ignore */ }
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            try { unlinkSync(f) } catch (_e) { /* ignore */ }
           })
           return {
             success: false,
@@ -467,17 +470,8 @@ export async function exportMultipleClips(
       }
     }
 
-    // Phase 2: Generate filelist with either temp files or original files
+    // Phase 2: Generate filelist for concatenation
     console.log('[Export] Generating filelist for concatenation...')
-    const filelistContent = clips.map((clip, i) => {
-      const isTrimmed = clip.trimStart > 0 || clip.trimEnd < clip.duration
-      const filePath = isTrimmed ? tempFiles[clips.slice(0, i).filter((c, idx) => 
-        c.trimStart > 0 || c.trimEnd < c.duration
-      ).length] : clip.filePath
-      return `file '${isTrimmed ? tempFiles[tempFiles.length - clips.length + i] || clip.filePath : clip.filePath}'`
-    }).join('\n')
-    
-    // Simpler approach: rebuild filelist
     const finalFilelistContent = clips.map((clip, i) => {
       const isTrimmed = clip.trimStart > 0 || clip.trimEnd < clip.duration
       if (isTrimmed) {
@@ -540,9 +534,11 @@ export async function exportMultipleClips(
 
       ffmpeg.on('error', (error) => {
         // Clean up
-        try { unlinkSync(filelistPath) } catch (e) { /* ignore */ }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        try { unlinkSync(filelistPath) } catch (_e) { /* ignore */ }
         tempFiles.forEach(f => {
-          try { unlinkSync(f) } catch (e) { /* ignore */ }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          try { unlinkSync(f) } catch (_e) { /* ignore */ }
         })
         
         resolve({
@@ -587,9 +583,11 @@ export async function exportMultipleClips(
     })
   } catch (error) {
     // Clean up on error
-    try { unlinkSync(filelistPath) } catch (e) { /* ignore */ }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    try { unlinkSync(filelistPath) } catch (_e) { /* ignore */ }
     tempFiles.forEach(f => {
-      try { unlinkSync(f) } catch (e) { /* ignore */ }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      try { unlinkSync(f) } catch (_e) { /* ignore */ }
     })
     
     return {

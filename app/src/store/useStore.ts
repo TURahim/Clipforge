@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Clip, TimelineClip, ExportProgress } from '../types'
+import type { StateCreator } from 'zustand'
 
 /**
  * Helper: Safely coerce numeric clip fields to valid numbers
@@ -10,7 +11,7 @@ function sanitizeClipNumbers(incoming: {
   duration?: number | string
   trimStart?: number | string
   trimEnd?: number | string
-  [key: string]: any
+  [key: string]: unknown
 }): {
   trimStart: number
   trimEnd: number
@@ -69,7 +70,7 @@ interface AppState {
   setExportProgress: (progress: Partial<ExportProgress>) => void
 }
 
-const storeConfig = (set: any) => ({
+const storeConfig: StateCreator<AppState> = (set) => ({
   // Initial state
   clips: [],
   timelineClips: [],
@@ -85,7 +86,7 @@ const storeConfig = (set: any) => ({
   
   // Actions
   addClip: (clip: Clip) =>
-    set((state: any) => {
+    set((state) => {
       console.log('[Store] addClip called:', clip.filename)
       
       // Validate incoming clip
@@ -120,14 +121,14 @@ const storeConfig = (set: any) => ({
     }),
   
   removeClip: (id: string) =>
-    set((state: any) => ({
+    set((state) => ({
       clips: state.clips.filter((c: Clip) => c.id !== id),
       timelineClips: state.timelineClips.filter((c: TimelineClip) => c.id !== id),
       selectedClipId: state.selectedClipId === id ? null : state.selectedClipId,
     })),
   
   addToTimeline: (incoming: Clip) =>
-    set((state: any) => {
+    set((state) => {
       console.log('[Store] addToTimeline called with:', incoming.filename)
       console.log('[Store] Current timeline clips:', state.timelineClips.length)
       
@@ -190,7 +191,7 @@ const storeConfig = (set: any) => ({
     }),
   
   removeFromTimeline: (id: string) =>
-    set((state: any) => {
+    set((state) => {
       console.log('[Store] removeFromTimeline called:', id)
       
       const clipExists = state.timelineClips.some((c: TimelineClip) => c.id === id)
@@ -233,7 +234,7 @@ const storeConfig = (set: any) => ({
     set({ isPlaying }),
   
   updateClipTrim: (id: string, trimStart: number, trimEnd: number) =>
-    set((state: any) => {
+    set((state) => {
       console.log('[Store] updateClipTrim called:', { id, trimStart, trimEnd })
       
       const clipIndex = state.timelineClips.findIndex((c: TimelineClip) => c.id === id)
@@ -290,7 +291,7 @@ const storeConfig = (set: any) => ({
     }),
   
   setExportProgress: (progress: Partial<ExportProgress>) =>
-    set((state: any) => ({
+    set((state) => ({
       exportProgress: { ...state.exportProgress, ...progress },
     })),
 })
