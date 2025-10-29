@@ -7,11 +7,16 @@ import { TimelineToolbar } from './TimelineToolbar'
 import {
   PIXELS_PER_SECOND,
   TIMELINE_HEIGHT,
+  TRACK_HEIGHT,
+  TRACK_GAP,
+  NUM_TRACKS,
   calculateClipPosition,
   calculateTotalDuration,
   formatTime,
   generateTimeMarkers,
   secondsToPixels,
+  getTrackY,
+  getTrackFromY,
 } from '../utils/timelineUtils'
 import { constrainTrimPoint } from '../utils/trimUtils'
 
@@ -23,13 +28,18 @@ export default function Timeline() {
   const setPlayheadPosition = useStore((state) => state.setPlayheadPosition)
   const addToTimeline = useStore((state) => state.addToTimeline)
   const updateClipTrim = useStore((state) => state.updateClipTrim)
+  const updateClipTrack = useStore((state) => state.updateClipTrack)
 
   // Diagnostic logging
   console.log('[Timeline] typeof addToTimeline =', typeof addToTimeline)
   console.log('[Timeline] store keys:', Object.keys(useStore.getState()))
 
   const containerRef = useRef<HTMLDivElement>(null)
-  const [containerSize, setContainerSize] = useState({ width: 800, height: 200 })
+  
+  // Calculate canvas height based on number of tracks
+  const canvasHeight = NUM_TRACKS * (TRACK_HEIGHT + TRACK_GAP) + 40 // +40 for time markers at top
+  
+  const [containerSize, setContainerSize] = useState({ width: 800, height: canvasHeight })
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
@@ -40,7 +50,7 @@ export default function Timeline() {
       if (containerRef.current) {
         setContainerSize({
           width: containerRef.current.offsetWidth,
-          height: 200,
+          height: canvasHeight,
         })
       }
     }
