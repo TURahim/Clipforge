@@ -48,20 +48,27 @@ function createWindow() {
     isPackaged: app.isPackaged,
   })
   
-  // Preload path: 
-  // - Dev mode (with dev server): use .cjs from dev build
-  // - Production (npx electron .): use .cjs if exists, otherwise .js
-  let preloadPath: string
-  if (isDev) {
-    preloadPath = join(__dirname, '../preload/preload.cjs')
-  } else {
-    // Try .cjs first (dev build), fall back to .js (production build)
-    const cjsPath = join(resourcesPath, 'out/preload/preload.cjs')
-    const jsPath = join(resourcesPath, 'out/preload/preload.js')
-    preloadPath = require('fs').existsSync(cjsPath) ? cjsPath : jsPath
+  // Preload path: Try multiple locations and use first one that exists
+  // - Dev build with dev server: ../preload/preload.cjs
+  // - Production build: ../preload/preload.js
+  const fs = require('fs')
+  const possiblePreloadPaths = [
+    join(__dirname, '../preload/preload.cjs'),  // Dev build
+    join(__dirname, '../preload/preload.js'),   // Production build
+    join(resourcesPath, 'out/preload/preload.cjs'),  // Packaged dev
+    join(resourcesPath, 'out/preload/preload.js'),   // Packaged production
+  ]
+  
+  let preloadPath = possiblePreloadPaths[0] // Default fallback
+  for (const path of possiblePreloadPaths) {
+    if (fs.existsSync(path)) {
+      preloadPath = path
+      break
+    }
   }
   
   console.log('[Main] Preload path:', preloadPath)
+  console.log('[Main] Preload exists:', fs.existsSync(preloadPath))
   
   mainWindow = new BrowserWindow({
     width: 1400,
