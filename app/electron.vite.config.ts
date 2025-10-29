@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => ({
   preload: {
     plugins: [
       externalizeDepsPlugin(),
-      ...(mode === 'production' ? [bytecodePlugin()] : [])
+      // Disable bytecode for preload to avoid path resolution issues
+      // ...(mode === 'production' ? [bytecodePlugin()] : [])
     ],
     build: {
       outDir: 'out/preload',
@@ -30,7 +31,7 @@ export default defineConfig(({ mode }) => ({
         input: resolve(__dirname, 'electron/preload.ts'),
         output: {
           format: 'cjs',
-          entryFileNames: mode === 'production' ? '[name].js' : '[name].cjs'
+          entryFileNames: '[name].cjs'  // Always use .cjs for consistency
         }
       }
     }

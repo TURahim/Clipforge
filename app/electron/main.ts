@@ -48,24 +48,11 @@ function createWindow() {
     isPackaged: app.isPackaged,
   })
   
-  // Preload path: Try multiple locations and use first one that exists
-  // - Dev build with dev server: ../preload/preload.cjs
-  // - Production build: ../preload/preload.js
+  // Preload path: Always use .cjs now (bytecode disabled for preload)
   const fs = require('fs')
-  const possiblePreloadPaths = [
-    join(__dirname, '../preload/preload.cjs'),  // Dev build
-    join(__dirname, '../preload/preload.js'),   // Production build
-    join(resourcesPath, 'out/preload/preload.cjs'),  // Packaged dev
-    join(resourcesPath, 'out/preload/preload.js'),   // Packaged production
-  ]
-  
-  let preloadPath = possiblePreloadPaths[0] // Default fallback
-  for (const path of possiblePreloadPaths) {
-    if (fs.existsSync(path)) {
-      preloadPath = path
-      break
-    }
-  }
+  const preloadPath = isDev 
+    ? join(__dirname, '../preload/preload.cjs')
+    : join(resourcesPath, 'out/preload/preload.cjs')
   
   console.log('[Main] Preload path:', preloadPath)
   console.log('[Main] Preload exists:', fs.existsSync(preloadPath))
