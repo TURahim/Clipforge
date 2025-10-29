@@ -55,6 +55,10 @@ interface AppState {
   isPlaying: boolean
   playheadPosition: number
   
+  // Timeline
+  zoomLevel: number // 1.0 = 100px/s (default), 0.25-4.0 range
+  snapEnabled: boolean
+  
   // Export
   exportProgress: ExportProgress
   
@@ -72,6 +76,10 @@ interface AppState {
   deleteClip: (clipId: string) => void
   updateClipTrack: (clipId: string, track: number) => void
   updateClipPosition: (clipId: string, position: { x: number; y: number }, scale?: number) => void
+  setZoomLevel: (level: number) => void
+  zoomIn: () => void
+  zoomOut: () => void
+  toggleSnap: () => void
 }
 
 const storeConfig: StateCreator<AppState> = (set) => ({
@@ -81,6 +89,8 @@ const storeConfig: StateCreator<AppState> = (set) => ({
   selectedClipId: null,
   isPlaying: false,
   playheadPosition: 0,
+  zoomLevel: 1.0, // 1.0 = 100px per second (default)
+  snapEnabled: true,
   exportProgress: {
     percentage: 0,
     currentTime: 0,
@@ -442,6 +452,23 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       
       return { timelineClips: updatedClips }
     }),
+  
+  // Zoom controls
+  setZoomLevel: (level: number) =>
+    set({ zoomLevel: Math.max(0.25, Math.min(4.0, level)) }),
+  
+  zoomIn: () =>
+    set((state) => ({ 
+      zoomLevel: Math.min(4.0, state.zoomLevel * 1.5) 
+    })),
+  
+  zoomOut: () =>
+    set((state) => ({ 
+      zoomLevel: Math.max(0.25, state.zoomLevel / 1.5) 
+    })),
+  
+  toggleSnap: () =>
+    set((state) => ({ snapEnabled: !state.snapEnabled })),
 })
 
 export const useStore = create<AppState>(storeConfig)

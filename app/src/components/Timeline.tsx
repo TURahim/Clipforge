@@ -5,8 +5,7 @@ import { useStore } from '../store/useStore'
 import Toast from './ui/Toast'
 import { TimelineToolbar } from './TimelineToolbar'
 import {
-  PIXELS_PER_SECOND,
-  TIMELINE_HEIGHT,
+  getEffectivePPS,
   TRACK_HEIGHT,
   TRACK_GAP,
   NUM_TRACKS,
@@ -24,11 +23,15 @@ export default function Timeline() {
   const timelineClips = useStore((state) => state.timelineClips)
   const selectedClipId = useStore((state) => state.selectedClipId)
   const playheadPosition = useStore((state) => state.playheadPosition)
+  const zoomLevel = useStore((state) => state.zoomLevel)
   const setSelectedClip = useStore((state) => state.selectClip)
   const setPlayheadPosition = useStore((state) => state.setPlayheadPosition)
   const addToTimeline = useStore((state) => state.addToTimeline)
   const updateClipTrim = useStore((state) => state.updateClipTrim)
   const updateClipTrack = useStore((state) => state.updateClipTrack)
+  
+  // Calculate effective pixels per second based on zoom level
+  const PIXELS_PER_SECOND = getEffectivePPS(zoomLevel)
 
   // Diagnostic logging
   console.log('[Timeline] typeof addToTimeline =', typeof addToTimeline)
@@ -169,11 +172,11 @@ export default function Timeline() {
       <TimelineToolbar />
       
       {/* Timeline Canvas */}
-      <div
-        ref={containerRef}
+    <div
+      ref={containerRef}
         className={`flex-1 overflow-x-auto overflow-y-hidden ${
-          isDraggingOver ? 'ring-2 ring-blue-500 ring-inset' : ''
-        }`}
+        isDraggingOver ? 'ring-2 ring-blue-500 ring-inset' : ''
+      }`}
       style={{ position: 'relative' }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -547,13 +550,13 @@ export default function Timeline() {
       )}
       
       {/* Toast Notification */}
-        {toast && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
-        )}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       </div>
     </div>
   )

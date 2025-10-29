@@ -1,7 +1,15 @@
 import type { TimelineClip } from '../types';
 
-export const PIXELS_PER_SECOND = 100; // 100px = 1 second
-export const MAX_ZOOM = 2; // For future zoom feature (Day 3)
+export const BASE_PIXELS_PER_SECOND = 100; // 100px = 1 second at 1.0 zoom
+export const MAX_ZOOM = 4.0; // Maximum zoom level
+export const MIN_ZOOM = 0.25; // Minimum zoom level
+
+/**
+ * Calculate effective pixels per second based on zoom level
+ */
+export function getEffectivePPS(zoomLevel: number): number {
+  return BASE_PIXELS_PER_SECOND * zoomLevel;
+}
 export const TIMELINE_HEIGHT = 100; // Height of each track in pixels
 export const TRACK_HEIGHT = 80; // Height of individual track
 export const TRACK_GAP = 10; // Gap between tracks
