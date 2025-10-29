@@ -3,6 +3,7 @@ import { join } from 'path'
 import { readFile, stat } from 'fs/promises'
 import { openFileDialog, validateVideoFile } from './handlers/file.handler'
 import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips, diagnoseFfmpeg } from './handlers/ffmpeg.handler'
+import { setupRecordingHandlers } from './handlers/recording.handler'
 import type { TimelineClip } from '../src/types'
 
 // Safe logging wrapper to prevent EPIPE errors
@@ -300,6 +301,9 @@ function registerCustomProtocol() {
 app.whenReady().then(() => {
   // Register custom protocol before creating window
   registerCustomProtocol()
+  
+  // Setup recording handlers
+  setupRecordingHandlers()
   
   registerIPCHandlers()
   createWindow()

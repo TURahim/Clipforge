@@ -3,6 +3,7 @@ import MediaLibrary from './components/MediaLibrary'
 import ExportControls from './components/ExportControls'
 import Timeline from './components/Timeline'
 import VideoPlayer from './components/VideoPlayer'
+import { RecordingControls } from './components/RecordingControls'
 import { useStore } from './store/useStore'
 
 function App() {
@@ -54,6 +55,9 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* Recording Controls */}
+      <RecordingControls />
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">

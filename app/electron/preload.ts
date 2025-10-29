@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('electron', {
       'generate-thumbnail',
       'open-file-dialog',
       'save-file-dialog',
+      'get-desktop-sources',
+      'save-recording',
     ]
     if (validChannels.includes(channel)) {
       return await ipcRenderer.invoke(channel, ...args)
