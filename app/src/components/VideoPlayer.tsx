@@ -222,10 +222,34 @@ export default function VideoPlayer() {
 
   // Load first clip when timeline clips change
   useEffect(() => {
-    if (timelineClips.length > 0 && currentClipIndex === -1) {
-      loadClipAtIndex(0)
+    // Reset when timeline becomes empty
+    if (timelineClips.length === 0) {
+      console.log('[VideoPlayer] Timeline empty, resetting player')
+      setCurrentClipIndex(-1)
+      setPlaying(false)
+      setError(null)
+      if (controllerRef.current && videoRef.current) {
+        controllerRef.current.pause()
+        videoRef.current.src = ''
+        videoRef.current.load()
+      }
+      return
     }
-  }, [timelineClips])
+    
+    // Load first clip if no clip is currently loaded
+    if (currentClipIndex === -1) {
+      console.log('[VideoPlayer] Loading first clip')
+      loadClipAtIndex(0)
+      return
+    }
+    
+    // If current clip index is out of bounds (clip was deleted), load the closest valid clip
+    if (currentClipIndex >= timelineClips.length) {
+      console.log('[VideoPlayer] Current clip deleted, loading clip at index', timelineClips.length - 1)
+      loadClipAtIndex(timelineClips.length - 1)
+      return
+    }
+  }, [timelineClips, currentClipIndex])
 
   // Handle volume changes
   useEffect(() => {
