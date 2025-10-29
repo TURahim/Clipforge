@@ -287,23 +287,21 @@ export default function Timeline() {
                     draggable
                     dragBoundFunc={(pos) => {
                       // Allow vertical movement between tracks, but keep horizontal position
-                      // Constrain Y to valid track range
-                      const minY = 30 + getTrackY(0) // 30 is Group y offset
-                      const maxY = 30 + getTrackY(NUM_TRACKS - 1)
+                      // Constrain Y to valid track range (coordinates are relative to Group)
+                      const minY = getTrackY(0)
+                      const maxY = getTrackY(NUM_TRACKS - 1)
                       return {
                         x: clipX + trimStartWidth,
                         y: Math.max(minY, Math.min(maxY, pos.y))
                       }
                     }}
                     onDragEnd={(e: KonvaEventObject<DragEvent>) => {
-                      const absoluteY = e.target.y()
-                      // Remove Group offset (30) to get relative Y position
-                      const relativeY = absoluteY - 30
-                      const newTrack = getTrackFromY(relativeY)
+                      // Y position is relative to Group (not Stage)
+                      const groupRelativeY = e.target.y()
+                      const newTrack = getTrackFromY(groupRelativeY)
                       
                       console.log('[Timeline] Drag ended:', {
-                        absoluteY,
-                        relativeY,
+                        groupRelativeY,
                         currentTrack: clip.track,
                         newTrack
                       })
@@ -313,9 +311,9 @@ export default function Timeline() {
                         updateClipTrack(clip.id, newTrack)
                       }
                       
-                      // Snap to correct track position
+                      // Snap to correct track position (relative to Group)
                       const targetTrackY = getTrackY(newTrack)
-                      e.target.position({ x: clipX + trimStartWidth, y: targetTrackY + 30 })
+                      e.target.position({ x: clipX + trimStartWidth, y: targetTrackY })
                     }}
                     onMouseDown={(e) => {
                       const container = e.target.getStage()?.container()
@@ -356,7 +354,7 @@ export default function Timeline() {
                         const maxX = clipX + trimStartWidth + clipWidth - 10
                         return {
                           x: Math.max(minX, Math.min(maxX, pos.x)),
-                          y: trackY + 30, // Keep on same y level relative to track
+                          y: trackY, // Keep on same y level relative to Group
                         }
                       }}
                       onDragEnd={(e: KonvaEventObject<DragEvent>) => {
@@ -391,7 +389,7 @@ export default function Timeline() {
                         const maxX = clipX + totalClipWidth
                         return {
                           x: Math.max(minX, Math.min(maxX, pos.x)),
-                          y: trackY + 30,
+                          y: trackY, // Keep on same y level relative to Group
                         }
                       }}
                       onDragEnd={(e: KonvaEventObject<DragEvent>) => {
