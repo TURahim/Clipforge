@@ -3,6 +3,9 @@ import type { TimelineClip } from '../types';
 export const PIXELS_PER_SECOND = 100; // 100px = 1 second
 export const MAX_ZOOM = 2; // For future zoom feature (Day 3)
 export const TIMELINE_HEIGHT = 100; // Height of each track in pixels
+export const TRACK_HEIGHT = 80; // Height of individual track
+export const TRACK_GAP = 10; // Gap between tracks
+export const NUM_TRACKS = 2; // Number of tracks (0 = main, 1 = overlay)
 
 /**
  * Safely extract duration from a clip, handling missing or invalid values
@@ -86,5 +89,20 @@ export function generateTimeMarkers(totalDuration: number): number[] {
   }
   
   return markers;
+}
+
+/**
+ * Calculate Y position for a given track number
+ */
+export function getTrackY(trackNumber: number): number {
+  return trackNumber * (TRACK_HEIGHT + TRACK_GAP);
+}
+
+/**
+ * Calculate track number from Y position
+ */
+export function getTrackFromY(y: number): number {
+  const track = Math.floor(y / (TRACK_HEIGHT + TRACK_GAP));
+  return Math.max(0, Math.min(NUM_TRACKS - 1, track));
 }
 
