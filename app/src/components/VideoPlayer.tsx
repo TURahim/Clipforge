@@ -409,10 +409,14 @@ export default function VideoPlayer() {
         {/* Overlay Track Video - PiP Inset (always rendered, hidden when not active) */}
         <video
           ref={overlayVideoRef}
-          className="absolute bottom-4 right-4 w-1/4 h-auto rounded-lg shadow-lg border-2 border-gray-600 z-10"
+          className="absolute rounded-xl shadow-2xl border-2 border-white/30 z-10"
           style={{ 
-            maxWidth: '300px', 
-            minWidth: '200px',
+            bottom: currentMainCaption ? '80px' : '16px', // Lift above captions if present
+            right: '16px',
+            width: '22%',
+            maxWidth: '320px',
+            minWidth: '180px',
+            aspectRatio: '16/9',
             display: currentOverlayClip ? 'block' : 'none'
           }}
         />
@@ -423,21 +427,26 @@ export default function VideoPlayer() {
           <div>Overlay: {currentOverlayClip ? '✓' : '✗'}</div>
         </div>
         
-        {/* Main Track Caption (Bottom) */}
+        {/* Main Track Caption (Bottom Center) */}
         {currentMainCaption && (
-          <div className="absolute bottom-4 left-0 right-0 text-center px-4 pointer-events-none z-20">
-            <span className="inline-block bg-black bg-opacity-90 text-white text-lg font-semibold px-4 py-2 rounded shadow-lg max-w-4xl">
-              {currentMainCaption.text}
-            </span>
+          <div className="absolute left-0 right-0 text-center px-4 pointer-events-none z-20" style={{ bottom: '16px' }}>
+            <div className="flex justify-center">
+              <span className="inline-block bg-black/90 text-white text-base font-semibold px-5 py-2.5 rounded-lg shadow-2xl backdrop-blur-sm" style={{ maxWidth: currentOverlayClip ? '60%' : '80%' }}>
+                {currentMainCaption.text}
+              </span>
+            </div>
           </div>
         )}
         
-        {/* Overlay Track Caption (Top) */}
+        {/* Overlay Track Caption (Top Center with Distinct Style) */}
         {currentOverlayCaption && (
-          <div className="absolute top-16 left-0 right-0 text-center px-4 pointer-events-none z-20">
-            <span className="inline-block bg-gradient-to-r from-purple-900 to-pink-900 bg-opacity-90 text-white text-lg font-semibold px-4 py-2 rounded shadow-lg max-w-4xl border-2 border-purple-400">
-              {currentOverlayCaption.text}
-            </span>
+          <div className="absolute top-20 left-0 right-0 text-center px-4 pointer-events-none z-20">
+            <div className="flex justify-center">
+              <span className="inline-block bg-gradient-to-r from-purple-900/95 to-pink-900/95 text-white text-base font-semibold px-5 py-2.5 rounded-lg shadow-2xl border-2 border-purple-400/50 backdrop-blur-sm max-w-2xl">
+                <span className="text-xs text-purple-200 mr-2">📹 PiP:</span>
+                {currentOverlayCaption.text}
+              </span>
+            </div>
           </div>
         )}
         
