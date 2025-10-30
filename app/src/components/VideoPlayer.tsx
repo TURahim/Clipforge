@@ -30,6 +30,11 @@ export default function VideoPlayer() {
   const [volume, setVolume] = useState<number>(1)
   const [isMuted, setIsMuted] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Debug: Track overlay clip state changes
+  useEffect(() => {
+    console.log('[VideoPlayer] 🎬 currentOverlayClip changed to:', currentOverlayClip)
+  }, [currentOverlayClip])
 
   // Helper function to get active clip for a specific track at current playhead position
   const getActiveClipForTrack = useCallback((track: number, position: number) => {
@@ -145,7 +150,10 @@ export default function VideoPlayer() {
   
   // Load a clip into the overlay video player
   const loadOverlayClip = useCallback(async (clip: TimelineClip) => {
-    if (!overlayControllerRef.current) return
+    if (!overlayControllerRef.current) {
+      console.warn('[VideoPlayer] No overlay controller ref!')
+      return
+    }
     
     try {
       console.log('[VideoPlayer] Loading overlay clip:', clip.filename)
@@ -159,13 +167,15 @@ export default function VideoPlayer() {
       await new Promise(resolve => setTimeout(resolve, 50))
       overlayControllerRef.current.seek(Math.max(clip.trimStart, Math.min(clip.trimEnd, videoTime)))
       
+      console.log('[VideoPlayer] Setting currentOverlayClip to:', clip.id)
       setCurrentOverlayClip(clip.id)
       
       if (isPlayingRef.current) {
+        console.log('[VideoPlayer] Auto-playing overlay')
         await overlayControllerRef.current.play()
       }
       
-      console.log('[VideoPlayer] Overlay clip loaded:', clip.filename)
+      console.log('[VideoPlayer] Overlay clip loaded successfully:', clip.filename)
     } catch (err) {
       console.error('[VideoPlayer] Failed to load overlay clip:', err)
     }
@@ -338,13 +348,22 @@ export default function VideoPlayer() {
           className="max-w-full max-h-full object-contain"
         />
         
-        {/* Overlay Track Video - PiP Inset */}
-        {currentOverlayClip && (
-          <video
-            ref={overlayVideoRef}
-            className="absolute bottom-4 right-4 w-1/4 h-auto rounded-lg shadow-lg border-2 border-gray-600"
-          />
-        )}
+        {/* Overlay Track Video - PiP Inset (always rendered, hidden when not active) */}
+        <video
+          ref={overlayVideoRef}
+          className="absolute bottom-4 right-4 w-1/4 h-auto rounded-lg shadow-lg border-2 border-gray-600 z-10"
+          style={{ 
+            maxWidth: '300px', 
+            minWidth: '200px',
+            display: currentOverlayClip ? 'block' : 'none'
+          }}
+        />
+        
+        {/* Debug: Show overlay status */}
+        <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
+          <div>Main: {currentMainClip ? '✓' : '✗'}</div>
+          <div>Overlay: {currentOverlayClip ? '✓' : '✗'}</div>
+        </div>
         
         {/* Error Overlay */}
         {error && (
