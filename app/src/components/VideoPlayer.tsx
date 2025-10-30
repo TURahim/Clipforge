@@ -430,24 +430,24 @@ export default function VideoPlayer() {
           <div>Overlay: {currentOverlayClip ? '✓' : '✗'}</div>
         </div>
         
+        {/* Overlay Track Caption (Bottom, stacked above main if both present) */}
+        {currentOverlayCaption && (
+          <div className="absolute left-0 right-0 text-center px-4 pointer-events-none z-20" style={{ bottom: currentMainCaption ? '80px' : '16px' }}>
+            <div className="flex justify-center">
+              <span className="inline-block bg-gradient-to-r from-purple-900/95 to-pink-900/95 text-white text-sm font-semibold px-4 py-2 rounded-lg shadow-2xl border-2 border-purple-400/50 backdrop-blur-sm" style={{ maxWidth: '70%' }}>
+                <span className="text-xs text-purple-200 mr-1">📹 PiP:</span>
+                {currentOverlayCaption.text}
+              </span>
+            </div>
+          </div>
+        )}
+        
         {/* Main Track Caption (Bottom Center) */}
         {currentMainCaption && (
           <div className="absolute left-0 right-0 text-center px-4 pointer-events-none z-20" style={{ bottom: '16px' }}>
             <div className="flex justify-center">
               <span className="inline-block bg-black/90 text-white text-base font-semibold px-5 py-2.5 rounded-lg shadow-2xl backdrop-blur-sm" style={{ maxWidth: currentOverlayClip ? '60%' : '80%' }}>
                 {currentMainCaption.text}
-              </span>
-            </div>
-          </div>
-        )}
-        
-        {/* Overlay Track Caption (Top Center with Distinct Style) */}
-        {currentOverlayCaption && (
-          <div className="absolute top-20 left-0 right-0 text-center px-4 pointer-events-none z-20">
-            <div className="flex justify-center">
-              <span className="inline-block bg-gradient-to-r from-purple-900/95 to-pink-900/95 text-white text-base font-semibold px-5 py-2.5 rounded-lg shadow-2xl border-2 border-purple-400/50 backdrop-blur-sm max-w-2xl">
-                <span className="text-xs text-purple-200 mr-2">📹 PiP:</span>
-                {currentOverlayCaption.text}
               </span>
             </div>
           </div>
