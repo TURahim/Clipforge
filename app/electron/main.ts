@@ -3,7 +3,7 @@ import { join } from 'path'
 import { readFile, stat } from 'fs/promises'
 import { readFileSync, unlinkSync } from 'fs'
 import { openFileDialog, validateVideoFile } from './handlers/file.handler'
-import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips, diagnoseFfmpeg, extractAudioForTranscription } from './handlers/ffmpeg.handler'
+import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips, diagnoseFfmpeg, extractAudioForTranscription, hasMultiTrackContent, exportUnifiedPiP } from './handlers/ffmpeg.handler'
 import { setupRecordingHandlers } from './handlers/recording.handler'
 import type { TimelineClip } from '../src/types'
 
@@ -212,7 +212,10 @@ function registerIPCHandlers() {
     try {
       let result
 
-      if (clips.length === 1) {
+      if (hasMultiTrackContent(clips)) {
+        // Multi-track PiP export
+        result = await exportUnifiedPiP(clips, outputPath, mainWindow, resolution)
+      } else if (clips.length === 1) {
         // Single clip export
         result = await exportSingleClip(clips[0], outputPath, mainWindow, resolution)
       } else {

@@ -3,7 +3,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { writeFileSync, unlinkSync, existsSync, readFileSync, chmodSync } from 'fs'
 import { BrowserWindow, app } from 'electron'
-import type { FFprobeResponse, VideoMetadata, TimelineClip } from '../../src/types'
+import type { FFprobeResponse, VideoMetadata, TimelineClip, Caption } from '../../src/types'
 
 /**
  * Get robust paths to ffmpeg and ffprobe binaries using installer packages
@@ -697,4 +697,369 @@ export async function extractAudioForTranscription(
       resolve({ success: true, audioPath })
     })
   })
+}
+
+/**
+ * Convert Caption array to SRT subtitle format
+ * Format: index, timecode (HH:MM:SS,mmm --> HH:MM:SS,mmm), text
+ */
+function generateSRTFile(captions: Caption[], outputPath: string): void {
+  if (captions.length === 0) {
+    return
+  }
+  
+  const srtContent = captions.map((caption, index) => {
+    const startTime = formatSRTTimecode(caption.start)
+    const endTime = formatSRTTimecode(caption.end)
+    
+    return `${index + 1}\n${startTime} --> ${endTime}\n${caption.text}\n`
+  }).join('\n')
+  
+  writeFileSync(outputPath, srtContent, 'utf-8')
+  console.log('[FFmpeg] Generated SRT file:', outputPath, `(${captions.length} captions)`)
+}
+
+/**
+ * Format seconds to SRT timecode format (HH:MM:SS,mmm)
+ */
+function formatSRTTimecode(seconds: number): string {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+  const milliseconds = Math.floor((seconds % 1) * 1000)
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${milliseconds.toString().padStart(3, '0')}`
+}
+
+/**
+ * Check if timeline contains multi-track content (PiP)
+ */
+export function hasMultiTrackContent(clips: TimelineClip[]): boolean {
+  return clips.some(clip => clip.track === 1)
+}
+
+/**
+ * Export unified PiP video with main track, overlay track, and captions
+ * Composites multiple tracks into a single output with PiP overlay and burned-in captions
+ */
+export async function exportUnifiedPiP(
+  clips: TimelineClip[],
+  outputPath: string,
+  mainWindow: BrowserWindow | null,
+  resolution?: ResolutionPreset
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    ensureBinaryPaths()
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to initialize FFmpeg: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    }
+  }
+
+  if (!ffmpegPath) {
+    return { success: false, error: 'FFmpeg binary not initialized' }
+  }
+
+  const timestamp = Date.now()
+  const tempFiles: string[] = []
+  const srtFiles: string[] = []
+
+  try {
+    // ===== PHASE 1: Prepare timeline segments =====
+    console.log('[Export PiP] Phase 1: Preparing timeline segments...')
+    
+    const mainClips = clips.filter(c => c.track === 0).sort((a, b) => a.startTime - b.startTime)
+    const overlayClips = clips.filter(c => c.track === 1).sort((a, b) => a.startTime - b.startTime)
+    
+    if (mainClips.length === 0) {
+      return { success: false, error: 'No main track clips found' }
+    }
+    
+    console.log(`[Export PiP] Main track: ${mainClips.length} clips, Overlay track: ${overlayClips.length} clips`)
+    
+    // Calculate total duration
+    const totalDuration = Math.max(
+      ...clips.map(c => c.startTime + (c.trimEnd - c.trimStart))
+    )
+    
+    // ===== PHASE 2: Generate caption files =====
+    console.log('[Export PiP] Phase 2: Generating caption files...')
+    
+    // Collect and adjust captions for main track
+    const mainCaptions: Caption[] = []
+    for (const clip of mainClips) {
+      if (clip.captions && clip.captions.length > 0) {
+        // Adjust caption timestamps to global timeline
+        const adjustedCaptions = clip.captions.map(caption => ({
+          start: clip.startTime + (caption.start - clip.trimStart),
+          end: clip.startTime + (caption.end - clip.trimStart),
+          text: caption.text
+        }))
+        mainCaptions.push(...adjustedCaptions)
+      }
+    }
+    
+    // Collect and adjust captions for overlay track
+    const overlayCaptions: Caption[] = []
+    for (const clip of overlayClips) {
+      if (clip.captions && clip.captions.length > 0) {
+        const adjustedCaptions = clip.captions.map(caption => ({
+          start: clip.startTime + (caption.start - clip.trimStart),
+          end: clip.startTime + (caption.end - clip.trimStart),
+          text: caption.text
+        }))
+        overlayCaptions.push(...adjustedCaptions)
+      }
+    }
+    
+    // Generate SRT files if captions exist
+    let mainSrtPath: string | null = null
+    let overlaySrtPath: string | null = null
+    
+    if (mainCaptions.length > 0) {
+      mainSrtPath = join(tmpdir(), `clipforge-main-captions-${timestamp}.srt`)
+      generateSRTFile(mainCaptions, mainSrtPath)
+      srtFiles.push(mainSrtPath)
+    }
+    
+    if (overlayCaptions.length > 0) {
+      overlaySrtPath = join(tmpdir(), `clipforge-overlay-captions-${timestamp}.srt`)
+      generateSRTFile(overlayCaptions, overlaySrtPath)
+      srtFiles.push(overlaySrtPath)
+    }
+    
+    console.log(`[Export PiP] Main captions: ${mainCaptions.length}, Overlay captions: ${overlayCaptions.length}`)
+    
+    // ===== PHASE 3: Build FFmpeg complex filter =====
+    console.log('[Export PiP] Phase 3: Building FFmpeg filter chain...')
+    
+    const args: string[] = []
+    const filterParts: string[] = []
+    let inputIndex = 0
+    
+    // Add all input files (main clips first, then overlay clips)
+    for (const clip of mainClips) {
+      args.push('-i', clip.filePath)
+      inputIndex++
+    }
+    
+    for (const clip of overlayClips) {
+      args.push('-i', clip.filePath)
+      inputIndex++
+    }
+    
+    // Build concat filters for each track
+    // Main track concat
+    if (mainClips.length === 1) {
+      // No concat needed, just trim and scale
+      const clip = mainClips[0]
+      const trimFilter = clip.trimStart > 0 || clip.trimEnd < clip.duration
+        ? `trim=start=${clip.trimStart}:end=${clip.trimEnd},setpts=PTS-STARTPTS`
+        : 'null'
+      filterParts.push(`[0:v]${trimFilter}[mainv]`)
+      filterParts.push(`[0:a]atrim=start=${clip.trimStart}:end=${clip.trimEnd},asetpts=PTS-STARTPTS[maina]`)
+    } else {
+      // Concat multiple main clips
+      const videoInputs = mainClips.map((_, i) => `[${i}:v]`).join('')
+      const audioInputs = mainClips.map((_, i) => `[${i}:a]`).join('')
+      filterParts.push(`${videoInputs}concat=n=${mainClips.length}:v=1:a=1[mainv][maina]`)
+    }
+    
+    // Overlay track concat (if exists)
+    if (overlayClips.length > 0) {
+      const overlayStartIndex = mainClips.length
+      
+      if (overlayClips.length === 1) {
+        const clip = overlayClips[0]
+        const trimFilter = clip.trimStart > 0 || clip.trimEnd < clip.duration
+          ? `trim=start=${clip.trimStart}:end=${clip.trimEnd},setpts=PTS-STARTPTS`
+          : 'null'
+        filterParts.push(`[${overlayStartIndex}:v]${trimFilter}[overlayv]`)
+        filterParts.push(`[${overlayStartIndex}:a]atrim=start=${clip.trimStart}:end=${clip.trimEnd},asetpts=PTS-STARTPTS[overlaya]`)
+      } else {
+        const videoInputs = overlayClips.map((_, i) => `[${overlayStartIndex + i}:v]`).join('')
+        const audioInputs = overlayClips.map((_, i) => `[${overlayStartIndex + i}:a]`).join('')
+        filterParts.push(`${videoInputs}concat=n=${overlayClips.length}:v=1:a=1[overlayv][overlaya]`)
+      }
+    }
+    
+    // Determine output resolution
+    let targetWidth = resolution?.width || null
+    let targetHeight = resolution?.height || null
+    
+    // If no resolution specified or 'source', use main video resolution
+    if (!targetWidth || !targetHeight || resolution?.value === 'source') {
+      // Get first main clip metadata for source resolution
+      const firstMainClip = mainClips[0]
+      if (firstMainClip.metadata) {
+        targetWidth = firstMainClip.metadata.width
+        targetHeight = firstMainClip.metadata.height
+      } else {
+        // Fallback to 1920x1080
+        targetWidth = 1920
+        targetHeight = 1080
+      }
+    }
+    
+    // Scale main video
+    filterParts.push(`[mainv]scale=${targetWidth}:${targetHeight}:force_original_aspect_ratio=decrease,pad=${targetWidth}:${targetHeight}:(ow-iw)/2:(oh-ih)/2[mainv_scaled]`)
+    
+    // Scale and position overlay (PiP)
+    if (overlayClips.length > 0) {
+      const pipWidth = Math.floor(targetWidth * 0.22) // 22% of output width
+      const pipHeight = Math.floor(pipWidth * 9 / 16) // Maintain 16:9 aspect ratio
+      
+      // Scale overlay to PiP size
+      filterParts.push(`[overlayv]scale=${pipWidth}:${pipHeight}:force_original_aspect_ratio=decrease,pad=${pipWidth}:${pipHeight}:(ow-iw)/2:(oh-ih)/2[overlayv_scaled]`)
+      
+      // Build overlay enable expression for each overlay clip segment
+      const enableExpressions = overlayClips.map(clip => {
+        const start = clip.startTime
+        const end = clip.startTime + (clip.trimEnd - clip.trimStart)
+        return `between(t,${start},${end})`
+      }).join('+')
+      
+      // Composite overlay onto main (bottom-right, 16px from edges, 80px from bottom for captions)
+      filterParts.push(`[mainv_scaled][overlayv_scaled]overlay=W-w-16:H-h-80:enable='${enableExpressions}'[outv]`)
+    } else {
+      // No overlay, just rename main
+      filterParts.push(`[mainv_scaled]copy[outv]`)
+    }
+    
+    // Apply subtitle filters if captions exist
+    let videoOutput = 'outv'
+    if (mainSrtPath || overlaySrtPath) {
+      // Escape paths for FFmpeg filter syntax
+      const escapeFilterPath = (path: string) => path.replace(/\\/g, '\\\\\\\\').replace(/:/g, '\\\\:')
+      
+      if (overlaySrtPath) {
+        // Overlay captions first (will appear above main captions)
+        const escapedPath = escapeFilterPath(overlaySrtPath)
+        filterParts.push(`[${videoOutput}]subtitles='${escapedPath}':force_style='Alignment=2,MarginV=80,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Outline=1,Shadow=1'[outv1]`)
+        videoOutput = 'outv1'
+      }
+      
+      if (mainSrtPath) {
+        // Main captions at bottom
+        const escapedPath = escapeFilterPath(mainSrtPath)
+        filterParts.push(`[${videoOutput}]subtitles='${escapedPath}':force_style='Alignment=2,MarginV=16,FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Outline=1,Shadow=1'[outv2]`)
+        videoOutput = 'outv2'
+      }
+    }
+    
+    // Combine filter chain
+    const filterComplex = filterParts.join(';')
+    args.push('-filter_complex', filterComplex)
+    
+    // Map output streams
+    args.push('-map', `[${videoOutput}]`)
+    
+    // Mix audio from both tracks if overlay exists
+    if (overlayClips.length > 0) {
+      args.push('-filter_complex', `[maina][overlaya]amix=inputs=2:duration=longest[outa]`)
+      args.push('-map', '[outa]')
+    } else {
+      args.push('-map', '[maina]')
+    }
+    
+    // Codec settings
+    args.push(
+      '-c:v', 'libx264',
+      '-preset', 'medium',
+      '-crf', '23',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-y',
+      outputPath
+    )
+    
+    console.log('[Export PiP] FFmpeg filter:', filterComplex)
+    
+    // ===== PHASE 4: Execute FFmpeg =====
+    console.log('[Export PiP] Phase 4: Executing FFmpeg...')
+    
+    return new Promise((resolve) => {
+      const ffmpeg = spawn(ffmpegPath, args)
+      let stderr = ''
+
+      ffmpeg.stderr.on('data', (data) => {
+        const output = data.toString()
+        stderr += output
+
+        // Parse progress
+        const timeMatch = output.match(/time=(\d+):(\d+):(\d+\.?\d*)/)
+        if (timeMatch && mainWindow) {
+          const hours = parseInt(timeMatch[1], 10)
+          const minutes = parseInt(timeMatch[2], 10)
+          const seconds = parseFloat(timeMatch[3])
+          const currentTime = hours * 3600 + minutes * 60 + seconds
+          const percentage = Math.min(Math.round((currentTime / totalDuration) * 100), 100)
+
+          mainWindow.webContents.send('export-progress', {
+            percentage,
+            currentTime,
+            totalDuration,
+          })
+        }
+      })
+
+      ffmpeg.on('error', (error) => {
+        // Cleanup
+        tempFiles.forEach(f => {
+          try { unlinkSync(f) } catch (e) { /* ignore */ }
+        })
+        srtFiles.forEach(f => {
+          try { unlinkSync(f) } catch (e) { /* ignore */ }
+        })
+        
+        resolve({
+          success: false,
+          error: `Failed to spawn FFmpeg: ${error.message}`,
+        })
+      })
+
+      ffmpeg.on('close', (code) => {
+        // Cleanup temp files
+        tempFiles.forEach(f => {
+          try { unlinkSync(f) } catch (e) { /* ignore */ }
+        })
+        srtFiles.forEach(f => {
+          try { unlinkSync(f) } catch (e) { /* ignore */ }
+        })
+        
+        if (code !== 0) {
+          resolve({
+            success: false,
+            error: `Export failed with code ${code}: ${stderr}`,
+          })
+          return
+        }
+
+        if (!existsSync(outputPath)) {
+          resolve({
+            success: false,
+            error: 'Output file was not created',
+          })
+          return
+        }
+
+        console.log('[Export PiP] Export completed successfully')
+        resolve({ success: true })
+      })
+    })
+  } catch (error) {
+    // Cleanup on error
+    tempFiles.forEach(f => {
+      try { unlinkSync(f) } catch (e) { /* ignore */ }
+    })
+    srtFiles.forEach(f => {
+      try { unlinkSync(f) } catch (e) { /* ignore */ }
+    })
+    
+    return {
+      success: false,
+      error: `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    }
+  }
 }
