@@ -9,8 +9,8 @@ export default function VideoPlayer() {
   // Video element refs for both tracks
   const mainVideoRef = useRef<HTMLVideoElement>(null)
   const overlayVideoRef = useRef<HTMLVideoElement>(null)
-  const mainControllerRef = useRef<VideoController>()
-  const overlayControllerRef = useRef<VideoController>()
+  const mainControllerRef = useRef<VideoController | undefined>(undefined)
+  const overlayControllerRef = useRef<VideoController | undefined>(undefined)
   
   const timelineClips = useStore((state) => state.timelineClips)
   const playheadPosition = useStore((state) => state.playheadPosition)
@@ -408,21 +408,20 @@ export default function VideoPlayer() {
           />
           
           {/* Overlay Track Video - PiP Inset (always rendered, hidden when not active) */}
-          {currentOverlayClip && (
-            <video
-              ref={overlayVideoRef}
-              className="absolute rounded-xl shadow-2xl border-2 border-white/30"
-              style={{ 
-                bottom: currentMainCaption ? '80px' : '16px',
-                right: '16px',
-                width: '22%',
-                maxWidth: '320px',
-                minWidth: '180px',
-                aspectRatio: '16/9',
-                zIndex: 10
-              }}
-            />
-          )}
+          <video
+            ref={overlayVideoRef}
+            className="absolute rounded-xl shadow-2xl border-2 border-white/30"
+            style={{ 
+              bottom: currentMainCaption ? '80px' : '16px',
+              right: '16px',
+              width: '22%',
+              maxWidth: '320px',
+              minWidth: '180px',
+              aspectRatio: '16/9',
+              zIndex: 10,
+              display: currentOverlayClip ? 'block' : 'none'
+            }}
+          />
         </div>
         
         {/* Debug: Show overlay status */}
