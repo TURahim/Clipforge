@@ -399,27 +399,31 @@ export default function VideoPlayer() {
   return (
     <div className="h-full bg-black flex flex-col">
       {/* Video Display */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-black">
-        {/* Main Track Video - Full Size */}
-        <video
-          ref={mainVideoRef}
-          className="max-w-full max-h-full object-contain"
-        />
-        
-        {/* Overlay Track Video - PiP Inset (always rendered, hidden when not active) */}
-        <video
-          ref={overlayVideoRef}
-          className="absolute rounded-xl shadow-2xl border-2 border-white/30 z-10"
-          style={{ 
-            bottom: currentMainCaption ? '80px' : '16px', // Lift above captions if present
-            right: '16px',
-            width: '22%',
-            maxWidth: '320px',
-            minWidth: '180px',
-            aspectRatio: '16/9',
-            display: currentOverlayClip ? 'block' : 'none'
-          }}
-        />
+      <div className="flex-1 flex items-center justify-center relative overflow-visible bg-black" style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div className="relative w-full h-full flex items-center justify-center">
+          {/* Main Track Video - Full Size */}
+          <video
+            ref={mainVideoRef}
+            className="max-w-full max-h-full object-contain"
+          />
+          
+          {/* Overlay Track Video - PiP Inset (always rendered, hidden when not active) */}
+          {currentOverlayClip && (
+            <video
+              ref={overlayVideoRef}
+              className="absolute rounded-xl shadow-2xl border-2 border-white/30"
+              style={{ 
+                bottom: currentMainCaption ? '80px' : '16px',
+                right: '16px',
+                width: '22%',
+                maxWidth: '320px',
+                minWidth: '180px',
+                aspectRatio: '16/9',
+                zIndex: 10
+              }}
+            />
+          )}
+        </div>
         
         {/* Debug: Show overlay status */}
         <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
