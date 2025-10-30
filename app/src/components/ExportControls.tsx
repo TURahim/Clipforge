@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore'
 import { Scissors, RotateCcw } from 'lucide-react'
 import ProgressBar from './ui/ProgressBar'
 import Toast from './ui/Toast'
+import { RESOLUTION_PRESETS } from '../utils/resolutionPresets'
 
 interface ToastState {
   message: string
@@ -17,6 +18,7 @@ export default function ExportControls() {
   const setExportProgress = useStore((state) => state.setExportProgress)
   const updateClipTrim = useStore((state) => state.updateClipTrim)
   const [toast, setToast] = useState<ToastState | null>(null)
+  const [selectedResolution, setSelectedResolution] = useState<string>('source')
   
   const selectedClip = timelineClips.find(c => c.id === selectedClipId)
 
@@ -86,10 +88,14 @@ export default function ExportControls() {
         ),
       })
 
+      // Get resolution preset
+      const resolutionPreset = RESOLUTION_PRESETS.find(p => p.value === selectedResolution)
+      
       const exportResult = await window.electron.invoke(
         'export-video',
         timelineClips,
-        saveResult.filePath
+        saveResult.filePath,
+        resolutionPreset
       ) as { success: boolean; error?: string }
 
       if (exportResult.success) {
@@ -232,6 +238,27 @@ export default function ExportControls() {
                 percentage={exportProgress.percentage}
                 label={`Exporting... ${formatTime(exportProgress.currentTime)} / ${formatTime(exportProgress.totalDuration)}`}
               />
+            </div>
+          )}
+
+          {/* Resolution Selection */}
+          {!exportProgress.isExporting && (
+            <div className="flex flex-col gap-1">
+              <label htmlFor="resolution-select" className="text-xs text-gray-400">
+                Export Resolution
+              </label>
+              <select
+                id="resolution-select"
+                value={selectedResolution}
+                onChange={(e) => setSelectedResolution(e.target.value)}
+                className="bg-gray-700 border border-gray-600 text-white py-2 px-3 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {RESOLUTION_PRESETS.map(preset => (
+                  <option key={preset.value} value={preset.value}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 

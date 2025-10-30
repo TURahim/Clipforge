@@ -318,13 +318,21 @@ export async function generateThumbnail(filePath: string): Promise<ThumbnailResu
   })
 }
 
+export interface ResolutionPreset {
+  label: string
+  value: string
+  width: number | null
+  height: number | null
+}
+
 /**
- * Export a single clip with optional trim points
+ * Export a single clip with optional trim points and resolution scaling
  */
 export async function exportSingleClip(
   clip: TimelineClip,
   outputPath: string,
-  mainWindow: BrowserWindow | null
+  mainWindow: BrowserWindow | null,
+  resolution?: ResolutionPreset
 ): Promise<{ success: boolean; error?: string }> {
   try {
     ensureBinaryPaths()
@@ -353,6 +361,14 @@ export async function exportSingleClip(
     if (clip.trimEnd < clip.duration) {
       const duration = clip.trimEnd - clip.trimStart
       args.push('-t', duration.toString())
+    }
+
+    // Add scale filter if resolution is specified and not 'source'
+    if (resolution && resolution.value !== 'source' && resolution.width && resolution.height) {
+      args.push(
+        '-vf',
+        `scale=${resolution.width}:${resolution.height}:force_original_aspect_ratio=decrease,pad=${resolution.width}:${resolution.height}:(ow-iw)/2:(oh-ih)/2`
+      )
     }
 
     // Codec settings
@@ -419,7 +435,8 @@ export async function exportSingleClip(
 export async function exportMultipleClips(
   clips: TimelineClip[],
   outputPath: string,
-  mainWindow: BrowserWindow | null
+  mainWindow: BrowserWindow | null,
+  resolution?: ResolutionPreset
 ): Promise<{ success: boolean; error?: string }> {
   try {
     ensureBinaryPaths()
@@ -453,7 +470,7 @@ export async function exportMultipleClips(
         
         console.log(`[Export] Trimming clip ${i + 1}/${clips.length}: ${clip.filename}`)
         
-        // Export trimmed clip to temp file
+        // Export trimmed clip to temp file (without resolution scaling yet)
         const trimResult = await exportSingleClip(clip, tempPath, null)
         
         if (!trimResult.success) {
@@ -499,13 +516,24 @@ export async function exportMultipleClips(
         '-f', 'concat',
         '-safe', '0',
         '-i', filelistPath,
+      ]
+
+      // Add scale filter if resolution is specified and not 'source'
+      if (resolution && resolution.value !== 'source' && resolution.width && resolution.height) {
+        args.push(
+          '-vf',
+          `scale=${resolution.width}:${resolution.height}:force_original_aspect_ratio=decrease,pad=${resolution.width}:${resolution.height}:(ow-iw)/2:(oh-ih)/2`
+        )
+      }
+
+      args.push(
         '-c:v', 'libx264',
         '-c:a', 'aac',
         '-preset', 'medium',
         '-crf', '23',
         '-y',
         outputPath,
-      ]
+      )
 
       const ffmpeg = spawn(ffmpegPath, args)
       const totalDuration = clips.reduce((sum, clip) => sum + (clip.trimEnd - clip.trimStart), 0)

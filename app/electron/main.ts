@@ -31,6 +31,7 @@ try {
       },
     },
   ])
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 } catch (error) {
   safeLog('[Main] Protocol registration will be handled in app.whenReady')
 }
@@ -206,16 +207,16 @@ function registerIPCHandlers() {
   })
 
   // Export video
-  ipcMain.handle('export-video', async (_event, clips: TimelineClip[], outputPath: string) => {
+  ipcMain.handle('export-video', async (_event, clips: TimelineClip[], outputPath: string, resolution?: { label: string; value: string; width: number | null; height: number | null }) => {
     try {
       let result
 
       if (clips.length === 1) {
         // Single clip export
-        result = await exportSingleClip(clips[0], outputPath, mainWindow)
+        result = await exportSingleClip(clips[0], outputPath, mainWindow, resolution)
       } else {
         // Multiple clips export
-        result = await exportMultipleClips(clips, outputPath, mainWindow)
+        result = await exportMultipleClips(clips, outputPath, mainWindow, resolution)
       }
 
       return result
