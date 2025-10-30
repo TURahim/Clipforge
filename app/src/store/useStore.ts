@@ -337,19 +337,25 @@ const storeConfig: StateCreator<AppState> = (set) => ({
         return state
       }
       
-      // Create two new clips
+      // Create two new clips with seamless positioning
       const timestamp = Date.now()
+      
+      // First clip: keeps original startTime, ends at split point
       const clip1: TimelineClip = {
         ...clip,
         id: `${clip.id}-split1-${timestamp}`,
         trimEnd: clip.trimStart + splitPoint,
       }
       
+      // Calculate clip1's duration to determine clip2's exact start position
+      const clip1Duration = clip1.trimEnd - clip1.trimStart
+      
+      // Second clip: starts exactly where clip1 ends (no gap)
       const clip2: TimelineClip = {
         ...clip,
         id: `${clip.id}-split2-${timestamp}`,
         trimStart: clip.trimStart + splitPoint,
-        startTime: clip.startTime + splitPoint,
+        startTime: clip1.startTime + clip1Duration, // Seamless: starts where clip1 ends
       }
       
       // Replace original with two new clips
@@ -358,7 +364,12 @@ const storeConfig: StateCreator<AppState> = (set) => ({
         .concat([clip1, clip2])
         .sort((a, b) => a.startTime - b.startTime)
       
-      console.log('[Store] Split clip:', { original: clip.id, clip1: clip1.id, clip2: clip2.id })
+      console.log('[Store] Split clip (seamless):', { 
+        original: clip.id, 
+        clip1: { id: clip1.id, start: clip1.startTime, duration: clip1Duration },
+        clip2: { id: clip2.id, start: clip2.startTime, duration: clip2.trimEnd - clip2.trimStart },
+        gap: clip2.startTime - (clip1.startTime + clip1Duration) // Should be 0
+      })
       
       return {
         timelineClips: newClips,
