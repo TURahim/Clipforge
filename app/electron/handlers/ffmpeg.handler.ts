@@ -948,16 +948,19 @@ export async function exportUnifiedPiP(
       }
     }
     
-    // Combine filter chain
+    // Add audio mixing to filter chain if overlay exists
+    if (overlayClips.length > 0) {
+      filterParts.push(`[maina][overlaya]amix=inputs=2:duration=longest[outa]`)
+    }
+    
+    // Combine all filters into single filter complex
     const filterComplex = filterParts.join(';')
     args.push('-filter_complex', filterComplex)
     
     // Map output streams
     args.push('-map', `[${videoOutput}]`)
     
-    // Mix audio from both tracks if overlay exists
     if (overlayClips.length > 0) {
-      args.push('-filter_complex', `[maina][overlaya]amix=inputs=2:duration=longest[outa]`)
       args.push('-map', '[outa]')
     } else {
       args.push('-map', '[maina]')
