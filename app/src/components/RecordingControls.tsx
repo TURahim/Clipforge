@@ -190,7 +190,11 @@ export function RecordingControls() {
             filename: screenResult.data.filePath.split('/').pop() || 'screen-recording.webm',
             duration: screenResult.data.metadata.duration,
             thumbnail: screenResult.data.thumbnail,
-            metadata: screenResult.data.metadata,
+            metadata: {
+              ...screenResult.data.metadata,
+              codec: 'vp8',
+              fileSize: 0
+            },
           }
           addClip(screenClip)
         }
@@ -202,7 +206,11 @@ export function RecordingControls() {
             filename: webcamResult.data.filePath.split('/').pop() || 'webcam-recording.webm',
             duration: webcamResult.data.metadata.duration,
             thumbnail: webcamResult.data.thumbnail,
-            metadata: webcamResult.data.metadata,
+            metadata: {
+              ...webcamResult.data.metadata,
+              codec: 'vp8',
+              fileSize: 0
+            },
           }
           addClip(webcamClip)
         }
@@ -249,7 +257,11 @@ export function RecordingControls() {
             filename: result.data.filePath.split('/').pop() || `${mode}-recording.webm`,
             duration: result.data.metadata.duration,
             thumbnail: result.data.thumbnail,
-            metadata: result.data.metadata,
+            metadata: {
+              ...result.data.metadata,
+              codec: 'vp8',
+              fileSize: 0
+            },
           }
           
           addClip(clip)
