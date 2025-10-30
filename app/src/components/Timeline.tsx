@@ -362,9 +362,11 @@ export default function Timeline() {
                       cornerRadius={2}
                       draggable
                       dragBoundFunc={(pos) => {
-                        // Constrain to clip bounds
-                        const minX = clipX
-                        const maxX = clipX + clipWidth - 10
+                        // Allow handle to move within the full source clip duration
+                        // minX: start of timeline (can trim all the way to source start)
+                        const minX = clipX - (clip.trimStart * PIXELS_PER_SECOND)
+                        // maxX: current clip end (can't trim past the end)
+                        const maxX = clipX + clipWidth
                         return {
                           x: Math.max(minX, Math.min(maxX, pos.x)),
                           y: trackY, // Keep on same y level relative to Group
@@ -374,7 +376,19 @@ export default function Timeline() {
                         const handleX = e.target.x()
                         const offsetInClip = (handleX - clipX) / PIXELS_PER_SECOND
                         const newTrimStart = clip.trimStart + offsetInClip
-                        const constrained = constrainTrimPoint(newTrimStart, clip.trimStart, clip.trimEnd - 0.5)
+                        // Constrain between 0 (start of source video) and trimEnd - 0.5
+                        const constrained = constrainTrimPoint(newTrimStart, 0, clip.trimEnd - 0.5)
+                        
+                        console.log('[Timeline] Left trim handle drag:', {
+                          handleX,
+                          clipX,
+                          offsetInClip,
+                          currentTrimStart: clip.trimStart,
+                          newTrimStart,
+                          constrained,
+                          trimEnd: clip.trimEnd
+                        })
+                        
                         updateClipTrim(clip.id, constrained, clip.trimEnd)
                       }}
                       onMouseEnter={(e) => {
@@ -399,7 +413,10 @@ export default function Timeline() {
                       cornerRadius={2}
                       draggable
                       dragBoundFunc={(pos) => {
+                        // Allow handle to move within the full source clip duration
+                        // minX: current clip start (can't trim past the start)
                         const minX = clipX + 10
+                        // maxX: end of source video (can trim all the way to source end)
                         const maxX = clipX + (clip.duration - clip.trimStart) * PIXELS_PER_SECOND
                         return {
                           x: Math.max(minX, Math.min(maxX, pos.x)),
@@ -410,7 +427,20 @@ export default function Timeline() {
                         const handleX = e.target.x()
                         const offsetInClip = (handleX - clipX) / PIXELS_PER_SECOND
                         const newTrimEnd = clip.trimStart + offsetInClip
+                        // Constrain between trimStart + 0.5 and duration (end of source video)
                         const constrained = constrainTrimPoint(newTrimEnd, clip.trimStart + 0.5, clip.duration)
+                        
+                        console.log('[Timeline] Right trim handle drag:', {
+                          handleX,
+                          clipX,
+                          offsetInClip,
+                          currentTrimEnd: clip.trimEnd,
+                          newTrimEnd,
+                          constrained,
+                          trimStart: clip.trimStart,
+                          duration: clip.duration
+                        })
+                        
                         updateClipTrim(clip.id, clip.trimStart, constrained)
                       }}
                       onMouseEnter={(e) => {
