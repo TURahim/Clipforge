@@ -1,125 +1,90 @@
-Title: Fix renderer loading production build in dev mode (ensure Vite dev server is used)
+Implement Picture-in-Picture (PiP) Playback View
 
-Context / Problem
-The Electron main process currently logs:
+Context:
+The timeline system now supports two tracks — the main track (index 0) and the overlay track (index 1) — and clips can be correctly added, moved, and trimmed on both.
 
-Loading production build from: /Users/.../app/out/renderer/index.html
+However, the video player currently only displays the main track’s clip. When both tracks contain clips (e.g., one in the main track and one in the overlay), playback ignores the overlay and shows only the main clip.
 
+We now want to render a Picture-in-Picture (PiP) view in the player — showing the overlay clip as a smaller, inset video layer on top of the main one during playback.
 
-when running pnpm dev.
-This means the BrowserWindow is opening the stale production bundle (file://…/out/renderer/index.html) instead of the Vite dev server (http://localhost:5173).
+🧠 Goal
 
-As a result:
+Enable the player to composite both video layers during playback:
 
-UI changes don’t hot-reload (HMR is bypassed).
+Main track → fills the full video player (base layer).
 
-Some assets (like scripts or styles) may be outdated or missing.
+Overlay track → appears as a smaller, movable/resizable inset (top-right corner by default).
 
-Drag-and-drop / IPC behaviors can differ between prod vs. dev.
+Both play in sync (same current time, play/pause, trimming respected).
 
-Additionally, the console shows harmless but noisy Chrome DevTools messages:
+Export behavior remains unchanged (only affects preview, not final render yet).
 
-"Request Autofill.enable failed..."
-"Request Autofill.setAddresses failed..."
+🧩 What you’ll need to look into
 
+VideoPlayer.tsx logic:
 
-These should be ignored or filtered out in dev logs.
+It currently likely renders a single <video> element or canvas context bound to the active clip.
 
-Goals
+Update it to handle two concurrent video elements:
 
-Ensure that when running pnpm dev, Electron loads the Vite dev server URL (not the built files).
+One for mainTrackClip
 
-Keep production behavior unchanged — when packaged, Electron should load the built index.html.
+One for overlayTrackClip
 
-Optionally filter or suppress irrelevant Chrome DevTools warnings (Autofill errors).
+They should share the same playback controls and time position from the store (playheadPosition, isPlaying).
 
-Confirm FFmpeg still initializes correctly under this new flow.
+Sync logic:
 
-Tasks
+When play/pause triggers, both videos should respond together.
 
-Update Electron main process window loader
+On seek/scrub, set both video.currentTime values to match the playhead.
 
-Locate where BrowserWindow is created (e.g., main/index.ts or main/main.ts).
+UI / styling:
 
-Replace hardcoded loadFile('out/renderer/index.html') with a dynamic check:
+Use absolute positioning to render the overlay clip inside the same player container.
 
-import path from 'node:path'
-import { app, BrowserWindow } from 'electron'
+Example (React JSX hint):
 
-const isDev = !app.isPackaged
-
-async function createWindow() {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-    },
-  })
-
-  if (isDev) {
-    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
-    await win.loadURL(devUrl)
-    win.webContents.openDevTools()
-    console.log('[Renderer] Loaded from Vite dev server:', devUrl)
-  } else {
-    const prodIndex = path.join(__dirname, '../renderer/index.html')
-    await win.loadFile(prodIndex)
-    console.log('[Renderer] Loaded production build:', prodIndex)
-  }
-}
-
-app.whenReady().then(createWindow)
+<div className="relative w-full h-full">
+  <video ref={mainRef} className="w-full h-full object-contain" />
+  <video
+    ref={overlayRef}
+    className="absolute bottom-4 right-4 w-1/4 h-auto rounded-lg shadow-lg border border-gray-600"
+  />
+</div>
 
 
-Keep the existing FFmpeg initialization untouched.
+Zustand store usage:
 
-Update pnpm dev script (if needed)
+You can derive active clips for each track:
 
-Ensure your package.json dev script starts both Vite and Electron concurrently, e.g.:
-
-"scripts": {
-  "dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\""
-}
+const mainClip = timelineClips.find(c => c.track === 0)
+const overlayClip = timelineClips.find(c => c.track === 1)
 
 
-Install concurrently and wait-on if missing:
+Ensure VideoPlayer updates both refs when these change.
 
-pnpm add -D concurrently wait-on cross-env
+Edge cases:
 
+Only one clip present → behave as before.
 
-Clean old build artifacts
+Overlay clip without main → overlay fills the frame.
 
-Remove stale build output to avoid confusion:
+When deleting clips, reset inactive players.
 
-rm -rf out dist .vite
+✅ Definition of Done
 
+When both tracks contain clips:
 
-Suppress irrelevant DevTools logs
+The player displays the main clip full-size.
 
-Optional: filter Autofill-related errors to declutter console.
+The overlay clip appears as a small PiP in the corner (configurable in future).
 
-win.webContents.on('console-message', (_, level, message) => {
-  if (message.includes('Autofill.enable') || message.includes('Autofill.setAddresses')) return
-  console.log(message)
-})
+Both videos stay in sync on play, pause, and scrubbing.
 
+When only one track is active, the player defaults to that track’s clip.
 
-Verify
+The rest of the editing pipeline (trimming, exporting) remains unchanged.
 
-Run pnpm dev → logs should show:
-
-[Renderer] Loaded from Vite dev server: http://localhost:5173
-
-
-Confirm live reloading works when editing React components.
-
-Ensure packaged build (pnpm build + pnpm start or pnpm make) still loads file://.../index.html.
-
-Acceptance Criteria
-
-✅ In dev, pnpm dev opens http://localhost:5173 (Vite HMR active).
-✅ In prod, packaged app loads out/renderer/index.html.
-✅ No stale builds or missing assets.
-✅ FFmpeg still initializes correctly.
-✅ DevTools Autofill warnings are suppressed.
+Hint:
+If performance becomes an issue with two <video> elements, consider a <canvas> compositing approach later. For now, focus on functional two-layer playback using synchronized <video> tags.

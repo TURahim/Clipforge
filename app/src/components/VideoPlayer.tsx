@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useStore } from '../store/useStore'
 import { VideoController } from '../utils/VideoController'
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { formatTime } from '../utils/timelineUtils'
+import type { TimelineClip } from '../types'
 
 export default function VideoPlayer() {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const controllerRef = useRef<VideoController>()
+  // Video element refs for both tracks
+  const mainVideoRef = useRef<HTMLVideoElement>(null)
+  const overlayVideoRef = useRef<HTMLVideoElement>(null)
+  const mainControllerRef = useRef<VideoController>()
+  const overlayControllerRef = useRef<VideoController>()
   
   const timelineClips = useStore((state) => state.timelineClips)
   const playheadPosition = useStore((state) => state.playheadPosition)
@@ -20,241 +24,281 @@ export default function VideoPlayer() {
     isPlayingRef.current = isPlaying
   }, [isPlaying])
   
-  // Use ref to prevent double transitions (race condition between onUpdate and onEnded)
-  const isTransitioningRef = useRef(false)
-  
-  const [currentClipIndex, setCurrentClipIndex] = useState<number>(-1)
+  // Track currently loaded clips for each track
+  const [currentMainClip, setCurrentMainClip] = useState<string | null>(null) // clip.id
+  const [currentOverlayClip, setCurrentOverlayClip] = useState<string | null>(null) // clip.id
   const [volume, setVolume] = useState<number>(1)
   const [isMuted, setIsMuted] = useState<boolean>(false)
-  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Initialize VideoController
+  // Helper function to get active clip for a specific track at current playhead position
+  const getActiveClipForTrack = useCallback((track: number, position: number) => {
+    const clipsOnTrack = timelineClips.filter(c => c.track === track)
+    for (const clip of clipsOnTrack) {
+      const clipEnd = clip.startTime + (clip.trimEnd - clip.trimStart)
+      if (position >= clip.startTime && position < clipEnd) {
+        return clip
+      }
+    }
+    return null
+  }, [timelineClips])
+
+  // Initialize VideoControllers for both tracks
   useEffect(() => {
-    if (videoRef.current && !controllerRef.current) {
-      controllerRef.current = new VideoController(videoRef.current)
+    if (mainVideoRef.current && !mainControllerRef.current) {
+      mainControllerRef.current = new VideoController(mainVideoRef.current)
+    }
+    
+    if (overlayVideoRef.current && !overlayControllerRef.current) {
+      overlayControllerRef.current = new VideoController(overlayVideoRef.current)
     }
     
     return () => {
-      if (controllerRef.current) {
-        controllerRef.current.destroy()
-        controllerRef.current = undefined
+      if (mainControllerRef.current) {
+        mainControllerRef.current.destroy()
+        mainControllerRef.current = undefined
+      }
+      if (overlayControllerRef.current) {
+        overlayControllerRef.current.destroy()
+        overlayControllerRef.current = undefined
       }
     }
   }, [])
   
-  // Update video controller callbacks when dependencies change
+  // Register callbacks for main video (drives playhead position)
   useEffect(() => {
-    if (!controllerRef.current) return
+    if (!mainControllerRef.current) return
     
-    // Register time update callback with current values
-    controllerRef.current.onUpdate((time) => {
-      // Calculate global timeline position
-      if (currentClipIndex >= 0 && currentClipIndex < timelineClips.length) {
-        const clip = timelineClips[currentClipIndex]
-        
-        // Check if we've reached the trim end point
-        if (time >= clip.trimEnd) {
-          // Prevent double transitions
-          if (isTransitioningRef.current) {
-            return
-          }
-          
-          // Move to next clip or stop playback
-          if (currentClipIndex < timelineClips.length - 1) {
-            console.log('[VideoPlayer] Transitioning to next clip:', currentClipIndex + 1)
-            isTransitioningRef.current = true
-            loadClipAtIndex(currentClipIndex + 1, true) // Auto-play next clip
-          } else {
-            console.log('[VideoPlayer] Reached end of timeline')
-            setPlaying(false)
-            controllerRef.current?.pause()
-          }
-          return
-        }
-        
-        const clipTimelineStart = clip.startTime
-        const clipLocalTime = time - clip.trimStart
-        const globalTime = clipTimelineStart + clipLocalTime
+    // Main video updates playhead position
+    mainControllerRef.current.onUpdate((time) => {
+      const mainClip = getActiveClipForTrack(0, playheadPosition)
+      if (mainClip && mainClip.id === currentMainClip) {
+        // Calculate global timeline position from video time
+        const clipLocalTime = time - mainClip.trimStart
+        const globalTime = mainClip.startTime + clipLocalTime
         setPlayheadPosition(globalTime)
+        
+        // Stop playback if we've reached the clip's trim end
+        if (time >= mainClip.trimEnd) {
+          const nextClip = getActiveClipForTrack(0, globalTime + 0.1)
+          if (!nextClip) {
+            console.log('[VideoPlayer] Main track ended')
+            setPlaying(false)
+          }
+        }
       }
     })
     
-    // Register ended callback
-    controllerRef.current.onEnded(() => {
-      // Prevent double transitions
-      if (isTransitioningRef.current) {
-        return
-      }
-      
-      // Move to next clip or stop
-      if (currentClipIndex < timelineClips.length - 1) {
-        console.log('[VideoPlayer] Clip ended, loading next clip:', currentClipIndex + 1)
-        isTransitioningRef.current = true
-        loadClipAtIndex(currentClipIndex + 1, true) // Auto-play next clip
-      } else {
-        console.log('[VideoPlayer] All clips finished')
+    mainControllerRef.current.onEnded(() => {
+      console.log('[VideoPlayer] Main video ended')
+      // Check if there's another clip ahead
+      const nextClip = getActiveClipForTrack(0, playheadPosition + 0.1)
+      if (!nextClip) {
         setPlaying(false)
-        setPlayheadPosition(0)
       }
     })
-  }, [currentClipIndex, timelineClips, setPlayheadPosition, setPlaying])
-
-  // Load clip at specific index
-  const loadClipAtIndex = async (index: number, shouldAutoPlay: boolean = false) => {
-    if (index < 0 || index >= timelineClips.length || !controllerRef.current) {
-      console.warn('[VideoPlayer] Cannot load clip - invalid index or no controller')
-      return
-    }
+  }, [currentMainClip, playheadPosition, setPlayheadPosition, setPlaying, getActiveClipForTrack])
+  
+  // Register callbacks for overlay video (follows playhead)
+  useEffect(() => {
+    if (!overlayControllerRef.current) return
     
-    const clip = timelineClips[index]
-    setIsLoading(true)
-    setError(null)
+    // Overlay video doesn't update playhead, just handles its own ended event
+    overlayControllerRef.current.onUpdate(() => {
+      // No-op: overlay follows main track's playhead
+    })
+    
+    overlayControllerRef.current.onEnded(() => {
+      console.log('[VideoPlayer] Overlay video ended')
+      // Overlay ending doesn't stop playback
+    })
+  }, [currentOverlayClip])
+
+  // Load a clip into the main video player
+  const loadMainClip = useCallback(async (clip: TimelineClip) => {
+    if (!mainControllerRef.current) return
     
     try {
-      console.log('[VideoPlayer] Loading clip:', {
-        index,
-        filename: clip.filename,
-        filePath: clip.filePath,
-        trimStart: clip.trimStart,
-        trimEnd: clip.trimEnd,
-        shouldAutoPlay
-      })
-      
-      // Use custom clipforge:// protocol to serve local video files
+      console.log('[VideoPlayer] Loading main clip:', clip.filename)
       const videoUrl = `clipforge://video/${encodeURIComponent(clip.filePath)}`
-      await controllerRef.current.load(videoUrl)
+      await mainControllerRef.current.load(videoUrl)
       
-      console.log('[VideoPlayer] Video loaded, setting clip index and seeking to', clip.trimStart)
-      setCurrentClipIndex(index)
+      // Calculate video time from playhead position
+      const clipLocalPosition = playheadPosition - clip.startTime
+      const videoTime = clip.trimStart + clipLocalPosition
       
-      // Small delay to ensure video is truly ready for seeking
       await new Promise(resolve => setTimeout(resolve, 50))
+      mainControllerRef.current.seek(Math.max(clip.trimStart, Math.min(clip.trimEnd, videoTime)))
       
-      // Seek to trim start point
-      controllerRef.current.seek(clip.trimStart)
-      console.log('[VideoPlayer] Seeked to', clip.trimStart)
+      setCurrentMainClip(clip.id)
       
-      // Resume playback if requested (for clip transitions)
-      if (shouldAutoPlay && isPlayingRef.current) {
-        console.log('[VideoPlayer] Auto-playing clip after load')
-        await controllerRef.current.play()
+      if (isPlayingRef.current) {
+        await mainControllerRef.current.play()
       }
       
-      setIsLoading(false)
-      isTransitioningRef.current = false // Clear transition lock
-      console.log('[VideoPlayer] Clip loaded successfully')
+      console.log('[VideoPlayer] Main clip loaded:', clip.filename)
     } catch (err) {
-      console.error('[VideoPlayer] Failed to load clip:', err, {
-        index,
-        filename: clip.filename,
-        filePath: clip.filePath
-      })
+      console.error('[VideoPlayer] Failed to load main clip:', err)
       setError('Failed to load video clip')
-      setIsLoading(false)
-      setPlaying(false) // Stop playback on error
-      isTransitioningRef.current = false // Clear transition lock on error
     }
-  }
-
-  // Determine which clip should be playing based on playhead position
-  const getClipAtPlayheadPosition = (position: number): number => {
-    for (let i = 0; i < timelineClips.length; i++) {
-      const clip = timelineClips[i]
-      const clipDuration = clip.trimEnd - clip.trimStart
-      const clipEnd = clip.startTime + clipDuration
+  }, [playheadPosition])
+  
+  // Load a clip into the overlay video player
+  const loadOverlayClip = useCallback(async (clip: TimelineClip) => {
+    if (!overlayControllerRef.current) return
+    
+    try {
+      console.log('[VideoPlayer] Loading overlay clip:', clip.filename)
+      const videoUrl = `clipforge://video/${encodeURIComponent(clip.filePath)}`
+      await overlayControllerRef.current.load(videoUrl)
       
-      if (position >= clip.startTime && position < clipEnd) {
-        return i
+      // Calculate video time from playhead position
+      const clipLocalPosition = playheadPosition - clip.startTime
+      const videoTime = clip.trimStart + clipLocalPosition
+      
+      await new Promise(resolve => setTimeout(resolve, 50))
+      overlayControllerRef.current.seek(Math.max(clip.trimStart, Math.min(clip.trimEnd, videoTime)))
+      
+      setCurrentOverlayClip(clip.id)
+      
+      if (isPlayingRef.current) {
+        await overlayControllerRef.current.play()
+      }
+      
+      console.log('[VideoPlayer] Overlay clip loaded:', clip.filename)
+    } catch (err) {
+      console.error('[VideoPlayer] Failed to load overlay clip:', err)
+    }
+  }, [playheadPosition])
+
+  // Sync both videos with playhead position changes
+  useEffect(() => {
+    if (timelineClips.length === 0) return
+    
+    // Determine active clips for both tracks at current playhead
+    const mainClip = getActiveClipForTrack(0, playheadPosition)
+    const overlayClip = getActiveClipForTrack(1, playheadPosition)
+    
+    // Handle main track
+    if (mainClip) {
+      if (mainClip.id !== currentMainClip) {
+        // Load new main clip
+        console.log('[VideoPlayer] Loading new main clip at playhead:', mainClip.filename)
+        loadMainClip(mainClip)
+      } else if (mainControllerRef.current) {
+        // Update seek position for current clip
+        const clipLocalPosition = playheadPosition - mainClip.startTime
+        const videoTime = mainClip.trimStart + clipLocalPosition
+        const currentVideoTime = mainControllerRef.current.getCurrentTime()
+        
+        if (Math.abs(currentVideoTime - videoTime) > 0.1) {
+          mainControllerRef.current.seek(videoTime)
+        }
+      }
+    } else if (currentMainClip) {
+      // No main clip at playhead, clear it
+      console.log('[VideoPlayer] No main clip at playhead, clearing')
+      setCurrentMainClip(null)
+      if (mainVideoRef.current) {
+        mainVideoRef.current.src = ''
       }
     }
-    return -1
-  }
+    
+    // Handle overlay track
+    if (overlayClip) {
+      if (overlayClip.id !== currentOverlayClip) {
+        // Load new overlay clip
+        console.log('[VideoPlayer] Loading new overlay clip at playhead:', overlayClip.filename)
+        loadOverlayClip(overlayClip)
+      } else if (overlayControllerRef.current) {
+        // Update seek position for current clip
+        const clipLocalPosition = playheadPosition - overlayClip.startTime
+        const videoTime = overlayClip.trimStart + clipLocalPosition
+        const currentVideoTime = overlayControllerRef.current.getCurrentTime()
+        
+        if (Math.abs(currentVideoTime - videoTime) > 0.1) {
+          overlayControllerRef.current.seek(videoTime)
+        }
+      }
+    } else if (currentOverlayClip) {
+      // No overlay clip at playhead, clear it
+      console.log('[VideoPlayer] No overlay clip at playhead, clearing')
+      setCurrentOverlayClip(null)
+      if (overlayVideoRef.current) {
+        overlayVideoRef.current.src = ''
+      }
+    }
+  }, [playheadPosition, timelineClips, currentMainClip, currentOverlayClip, getActiveClipForTrack, loadMainClip, loadOverlayClip])
 
-  // Sync video with playhead position changes
+  // Handle play/pause state changes for both tracks
   useEffect(() => {
-    if (!controllerRef.current || timelineClips.length === 0) return
-    
-    const targetClipIndex = getClipAtPlayheadPosition(playheadPosition)
-    
-    if (targetClipIndex === -1) {
-      // Playhead is outside all clips
-      return
-    }
-    
-    // Load new clip if needed (happens when scrubbing across clip boundaries)
-    if (targetClipIndex !== currentClipIndex) {
-      console.log('[VideoPlayer] Scrubbing to different clip:', targetClipIndex)
-      loadClipAtIndex(targetClipIndex, isPlaying) // Maintain playback state
-      return
-    }
-    
-    // Update video time based on playhead position
-    const clip = timelineClips[targetClipIndex]
-    const clipLocalPosition = playheadPosition - clip.startTime
-    const videoTime = clip.trimStart + clipLocalPosition
-    
-    // Only seek if there's a significant difference (avoid constant seeking)
-    const currentVideoTime = controllerRef.current.getCurrentTime()
-    if (Math.abs(currentVideoTime - videoTime) > 0.1) {
-      controllerRef.current.seek(videoTime)
-    }
-  }, [playheadPosition, timelineClips, currentClipIndex])
-
-  // Handle play/pause state changes
-  useEffect(() => {
-    if (!controllerRef.current) return
-    
     if (isPlaying) {
-      // Ensure we have a clip loaded
-      if (currentClipIndex === -1 && timelineClips.length > 0) {
-        loadClipAtIndex(0)
-      } else {
-        controllerRef.current.play().catch((err) => {
-          console.error('[VideoPlayer] Failed to play:', err)
+      // Play both videos if they're loaded
+      if (mainControllerRef.current && currentMainClip) {
+        mainControllerRef.current.play().catch((err) => {
+          console.error('[VideoPlayer] Failed to play main:', err)
           setPlaying(false)
         })
       }
+      
+      if (overlayControllerRef.current && currentOverlayClip) {
+        overlayControllerRef.current.play().catch((err) => {
+          console.error('[VideoPlayer] Failed to play overlay:', err)
+        })
+      }
     } else {
-      controllerRef.current.pause()
+      // Pause both videos
+      if (mainControllerRef.current) {
+        mainControllerRef.current.pause()
+      }
+      
+      if (overlayControllerRef.current) {
+        overlayControllerRef.current.pause()
+      }
     }
-  }, [isPlaying])
+  }, [isPlaying, currentMainClip, currentOverlayClip, setPlaying])
 
-  // Load first clip when timeline clips change
+  // Reset players when timeline becomes empty
   useEffect(() => {
-    // Reset when timeline becomes empty
     if (timelineClips.length === 0) {
-      console.log('[VideoPlayer] Timeline empty, resetting player')
-      setCurrentClipIndex(-1)
+      console.log('[VideoPlayer] Timeline empty, resetting both players')
+      setCurrentMainClip(null)
+      setCurrentOverlayClip(null)
       setPlaying(false)
       setError(null)
-      if (controllerRef.current && videoRef.current) {
-        controllerRef.current.pause()
-        videoRef.current.src = ''
-        videoRef.current.load()
+      
+      // Clear both video sources
+      if (mainVideoRef.current) {
+        mainVideoRef.current.src = ''
+        mainVideoRef.current.load()
       }
-      return
+      
+      if (overlayVideoRef.current) {
+        overlayVideoRef.current.src = ''
+        overlayVideoRef.current.load()
+      }
+      
+      // Pause both controllers
+      if (mainControllerRef.current) {
+        mainControllerRef.current.pause()
+      }
+      
+      if (overlayControllerRef.current) {
+        overlayControllerRef.current.pause()
+      }
     }
-    
-    // Load first clip if no clip is currently loaded
-    if (currentClipIndex === -1) {
-      console.log('[VideoPlayer] Loading first clip')
-      loadClipAtIndex(0)
-      return
-    }
-    
-    // If current clip index is out of bounds (clip was deleted), load the closest valid clip
-    if (currentClipIndex >= timelineClips.length) {
-      console.log('[VideoPlayer] Current clip deleted, loading clip at index', timelineClips.length - 1)
-      loadClipAtIndex(timelineClips.length - 1)
-      return
-    }
-  }, [timelineClips, currentClipIndex])
+  }, [timelineClips.length, setPlaying])
 
-  // Handle volume changes
+  // Handle volume changes for both videos
   useEffect(() => {
-    if (controllerRef.current) {
-      controllerRef.current.setVolume(isMuted ? 0 : volume)
+    const volumeLevel = isMuted ? 0 : volume
+    
+    if (mainControllerRef.current) {
+      mainControllerRef.current.setVolume(volumeLevel)
+    }
+    
+    if (overlayControllerRef.current) {
+      overlayControllerRef.current.setVolume(volumeLevel)
     }
   }, [volume, isMuted])
 
@@ -281,17 +325,19 @@ export default function VideoPlayer() {
   return (
     <div className="h-full bg-black flex flex-col">
       {/* Video Display */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden">
+      <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-black">
+        {/* Main Track Video - Full Size */}
         <video
-          ref={videoRef}
+          ref={mainVideoRef}
           className="max-w-full max-h-full object-contain"
         />
         
-        {/* Loading Overlay */}
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="text-white text-lg">Loading video...</div>
-          </div>
+        {/* Overlay Track Video - PiP Inset */}
+        {currentOverlayClip && (
+          <video
+            ref={overlayVideoRef}
+            className="absolute bottom-4 right-4 w-1/4 h-auto rounded-lg shadow-lg border-2 border-gray-600"
+          />
         )}
         
         {/* Error Overlay */}
@@ -310,7 +356,7 @@ export default function VideoPlayer() {
         )}
         
         {/* Empty State */}
-        {!isLoading && !error && timelineClips.length === 0 && (
+        {!error && timelineClips.length === 0 && (
           <div className="text-center text-gray-500">
             <p className="text-lg mb-2">No clips on timeline</p>
             <p className="text-sm">Add clips to the timeline to preview</p>
@@ -373,11 +419,19 @@ export default function VideoPlayer() {
           </div>
           
           {/* Current Clip Info */}
-          {currentClipIndex >= 0 && currentClipIndex < timelineClips.length && (
+          {(currentMainClip || currentOverlayClip) && (
             <div className="text-xs text-gray-400">
-              <span>Clip {currentClipIndex + 1} of {timelineClips.length}</span>
-              <span className="mx-2">•</span>
-              <span>{timelineClips[currentClipIndex].filename}</span>
+              {currentMainClip && (
+                <>
+                  <span>Main: {timelineClips.find(c => c.id === currentMainClip)?.filename}</span>
+                </>
+              )}
+              {currentMainClip && currentOverlayClip && <span className="mx-2">•</span>}
+              {currentOverlayClip && (
+                <>
+                  <span>PiP: {timelineClips.find(c => c.id === currentOverlayClip)?.filename}</span>
+                </>
+              )}
             </div>
           )}
         </div>
