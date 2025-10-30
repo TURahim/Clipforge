@@ -276,8 +276,19 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       const boundedTrimStart = Math.max(0, Math.min(safeTrimStart, clip.duration))
       const boundedTrimEnd = Math.max(boundedTrimStart, Math.min(safeTrimEnd, clip.duration))
       
-      if (boundedTrimStart === clip.trimStart && boundedTrimEnd === clip.trimEnd) {
-        console.log('[Store] No trim change detected, skipping update')
+      // Check if there's actually a meaningful change (with small tolerance for floating point precision)
+      const trimStartChanged = Math.abs(boundedTrimStart - clip.trimStart) > 0.001
+      const trimEndChanged = Math.abs(boundedTrimEnd - clip.trimEnd) > 0.001
+      
+      if (!trimStartChanged && !trimEndChanged) {
+        console.log('[Store] No meaningful trim change detected, skipping update', {
+          original: { trimStart: clip.trimStart, trimEnd: clip.trimEnd },
+          new: { trimStart: boundedTrimStart, trimEnd: boundedTrimEnd },
+          differences: { 
+            trimStartDiff: Math.abs(boundedTrimStart - clip.trimStart),
+            trimEndDiff: Math.abs(boundedTrimEnd - clip.trimEnd)
+          }
+        })
         return state
       }
       

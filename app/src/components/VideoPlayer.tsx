@@ -38,6 +38,50 @@ export default function VideoPlayer() {
     console.log('[VideoPlayer] 🎬 currentOverlayClip changed to:', currentOverlayClip)
   }, [currentOverlayClip])
 
+  // Handle trim changes - immediately seek to correct position when trim values change
+  useEffect(() => {
+    const mainClip = getActiveClipForTrack(0, playheadPosition)
+    if (mainClip && mainControllerRef.current) {
+      const clipLocalPosition = playheadPosition - mainClip.startTime
+      const videoTime = mainClip.trimStart + clipLocalPosition
+      const boundedVideoTime = Math.max(mainClip.trimStart, Math.min(mainClip.trimEnd, videoTime))
+      
+      console.log('[VideoPlayer] Trim changed, seeking to:', {
+        clipId: mainClip.id,
+        playheadPosition,
+        clipLocalPosition,
+        videoTime,
+        boundedVideoTime,
+        trimStart: mainClip.trimStart,
+        trimEnd: mainClip.trimEnd
+      })
+      
+      mainControllerRef.current.seek(boundedVideoTime)
+    }
+  }, [timelineClips, playheadPosition]) // Re-run when clips or playhead change
+
+  // Handle trim changes for overlay clips
+  useEffect(() => {
+    const overlayClip = getActiveClipForTrack(1, playheadPosition)
+    if (overlayClip && overlayControllerRef.current) {
+      const clipLocalPosition = playheadPosition - overlayClip.startTime
+      const videoTime = overlayClip.trimStart + clipLocalPosition
+      const boundedVideoTime = Math.max(overlayClip.trimStart, Math.min(overlayClip.trimEnd, videoTime))
+      
+      console.log('[VideoPlayer] Overlay trim changed, seeking to:', {
+        clipId: overlayClip.id,
+        playheadPosition,
+        clipLocalPosition,
+        videoTime,
+        boundedVideoTime,
+        trimStart: overlayClip.trimStart,
+        trimEnd: overlayClip.trimEnd
+      })
+      
+      overlayControllerRef.current.seek(boundedVideoTime)
+    }
+  }, [timelineClips, playheadPosition])
+
   // Helper function to get active clip for a specific track at current playhead position
   const getActiveClipForTrack = useCallback((track: number, position: number) => {
     const clipsOnTrack = timelineClips.filter(c => c.track === track)
