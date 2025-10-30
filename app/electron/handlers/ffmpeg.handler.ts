@@ -851,6 +851,7 @@ export async function exportUnifiedPiP(
     
     // Build concat filters for each track
     // Main track concat
+    let mainHasAudio = false
     if (mainClips.length === 1) {
       // No concat needed, just trim and scale
       const clip = mainClips[0]
@@ -858,15 +859,27 @@ export async function exportUnifiedPiP(
         ? `trim=start=${clip.trimStart}:end=${clip.trimEnd},setpts=PTS-STARTPTS`
         : 'null'
       filterParts.push(`[0:v]${trimFilter}[mainv]`)
-      filterParts.push(`[0:a]atrim=start=${clip.trimStart}:end=${clip.trimEnd},asetpts=PTS-STARTPTS[maina]`)
+      
+      // Check if this clip has audio by checking if it's a screen recording (typically no audio)
+      // Screen recordings have no audio, webcam recordings have audio
+      // We'll try to use the audio stream, and if it fails, we'll handle it
+      // For now, assume screen recordings (from desktopCapturer) have no audio
+      // and webcam recordings have audio
+      const isScreenRecording = clip.filename.includes('screen-recording')
+      if (!isScreenRecording) {
+        filterParts.push(`[0:a]atrim=start=${clip.trimStart}:end=${clip.trimEnd},asetpts=PTS-STARTPTS[maina]`)
+        mainHasAudio = true
+      }
     } else {
       // Concat multiple main clips
       const videoInputs = mainClips.map((_, i) => `[${i}:v]`).join('')
       const audioInputs = mainClips.map((_, i) => `[${i}:a]`).join('')
       filterParts.push(`${videoInputs}concat=n=${mainClips.length}:v=1:a=1[mainv][maina]`)
+      mainHasAudio = true
     }
     
     // Overlay track concat (if exists)
+    let overlayHasAudio = false
     if (overlayClips.length > 0) {
       const overlayStartIndex = mainClips.length
       
@@ -876,11 +889,18 @@ export async function exportUnifiedPiP(
           ? `trim=start=${clip.trimStart}:end=${clip.trimEnd},setpts=PTS-STARTPTS`
           : 'null'
         filterParts.push(`[${overlayStartIndex}:v]${trimFilter}[overlayv]`)
-        filterParts.push(`[${overlayStartIndex}:a]atrim=start=${clip.trimStart}:end=${clip.trimEnd},asetpts=PTS-STARTPTS[overlaya]`)
+        
+        // Check if overlay clip has audio
+        const isScreenRecording = clip.filename.includes('screen-recording')
+        if (!isScreenRecording) {
+          filterParts.push(`[${overlayStartIndex}:a]atrim=start=${clip.trimStart}:end=${clip.trimEnd},asetpts=PTS-STARTPTS[overlaya]`)
+          overlayHasAudio = true
+        }
       } else {
         const videoInputs = overlayClips.map((_, i) => `[${overlayStartIndex + i}:v]`).join('')
         const audioInputs = overlayClips.map((_, i) => `[${overlayStartIndex + i}:a]`).join('')
         filterParts.push(`${videoInputs}concat=n=${overlayClips.length}:v=1:a=1[overlayv][overlaya]`)
+        overlayHasAudio = true
       }
     }
     
@@ -948,10 +968,21 @@ export async function exportUnifiedPiP(
       }
     }
     
-    // Add audio mixing to filter chain if overlay exists
-    if (overlayClips.length > 0) {
+    // Handle audio mixing based on which tracks have audio
+    let finalAudioLabel: string | null = null
+    
+    if (mainHasAudio && overlayHasAudio) {
+      // Both have audio: mix them
       filterParts.push(`[maina][overlaya]amix=inputs=2:duration=longest[outa]`)
+      finalAudioLabel = 'outa'
+    } else if (mainHasAudio) {
+      // Only main has audio
+      finalAudioLabel = 'maina'
+    } else if (overlayHasAudio) {
+      // Only overlay has audio
+      finalAudioLabel = 'overlaya'
     }
+    // If neither has audio, finalAudioLabel remains null
     
     // Combine all filters into single filter complex
     const filterComplex = filterParts.join(';')
@@ -960,22 +991,24 @@ export async function exportUnifiedPiP(
     // Map output streams
     args.push('-map', `[${videoOutput}]`)
     
-    if (overlayClips.length > 0) {
-      args.push('-map', '[outa]')
-    } else {
-      args.push('-map', '[maina]')
+    // Map audio if available
+    if (finalAudioLabel) {
+      args.push('-map', `[${finalAudioLabel}]`)
     }
     
     // Codec settings
     args.push(
       '-c:v', 'libx264',
       '-preset', 'medium',
-      '-crf', '23',
-      '-c:a', 'aac',
-      '-b:a', '192k',
-      '-y',
-      outputPath
+      '-crf', '23'
     )
+    
+    // Only add audio codec if we have audio
+    if (finalAudioLabel) {
+      args.push('-c:a', 'aac', '-b:a', '192k')
+    }
+    
+    args.push('-y', outputPath)
     
     console.log('[Export PiP] FFmpeg filter:', filterComplex)
     
