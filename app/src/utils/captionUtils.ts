@@ -107,8 +107,15 @@ export async function generateCaptions(
     // Step 2: Get API key from environment
     const apiKey = import.meta.env.VITE_OPENAI_API_KEY
     
+    console.log('[Captions] API key exists:', !!apiKey)
+    console.log('[Captions] API key starts with:', apiKey?.substring(0, 7))
+    
     if (!apiKey) {
       throw new Error('OpenAI API key not configured. Please set VITE_OPENAI_API_KEY in .env.local')
+    }
+    
+    if (apiKey === 'your-api-key-here') {
+      throw new Error('Please replace "your-api-key-here" with your actual OpenAI API key in .env.local')
     }
     
     // Step 3: Read audio file

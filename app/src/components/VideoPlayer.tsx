@@ -332,6 +332,12 @@ export default function VideoPlayer() {
       return
     }
     
+    // Debug: Log caption info
+    if (clip.captions.length > 0 && playheadPosition % 1 < 0.1) {
+      console.log('[Captions] Clip has', clip.captions.length, 'captions')
+      console.log('[Captions] First caption:', clip.captions[0])
+    }
+    
     // Calculate local time within clip
     const localTime = playheadPosition - clip.startTime + clip.trimStart
     
@@ -340,8 +346,12 @@ export default function VideoPlayer() {
       c => localTime >= c.start && localTime <= c.end
     )
     
+    if (caption && caption !== currentCaption) {
+      console.log('[Captions] Showing caption:', caption.text)
+    }
+    
     setCurrentCaption(caption || null)
-  }, [playheadPosition, currentMainClip, timelineClips])
+  }, [playheadPosition, currentMainClip, timelineClips, currentCaption])
 
   const handlePlayPause = () => {
     setPlaying(!isPlaying)
