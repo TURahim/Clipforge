@@ -340,21 +340,27 @@ const storeConfig: StateCreator<AppState> = (set) => ({
       // Create two new clips with seamless positioning
       const timestamp = Date.now()
       
-      // First clip: keeps original startTime, ends at split point
+      // Calculate the absolute split point in the source video
+      const absoluteSplitPoint = clip.trimStart + splitPoint
+      
+      // First clip: from original trimStart to split point
       const clip1: TimelineClip = {
         ...clip,
         id: `${clip.id}-split1-${timestamp}`,
-        trimEnd: clip.trimStart + splitPoint,
+        trimStart: clip.trimStart,  // Explicitly preserve original trimStart
+        trimEnd: absoluteSplitPoint, // End at split point
+        startTime: clip.startTime,   // Keep original timeline position
       }
       
       // Calculate clip1's duration to determine clip2's exact start position
       const clip1Duration = clip1.trimEnd - clip1.trimStart
       
-      // Second clip: starts exactly where clip1 ends (no gap)
+      // Second clip: from split point to original trimEnd
       const clip2: TimelineClip = {
         ...clip,
         id: `${clip.id}-split2-${timestamp}`,
-        trimStart: clip.trimStart + splitPoint,
+        trimStart: absoluteSplitPoint, // Start at split point
+        trimEnd: clip.trimEnd,         // Explicitly preserve original trimEnd
         startTime: clip1.startTime + clip1Duration, // Seamless: starts where clip1 ends
       }
       
@@ -365,9 +371,27 @@ const storeConfig: StateCreator<AppState> = (set) => ({
         .sort((a, b) => a.startTime - b.startTime)
       
       console.log('[Store] Split clip (seamless):', { 
-        original: clip.id, 
-        clip1: { id: clip1.id, start: clip1.startTime, duration: clip1Duration },
-        clip2: { id: clip2.id, start: clip2.startTime, duration: clip2.trimEnd - clip2.trimStart },
+        original: { 
+          id: clip.id, 
+          trimStart: clip.trimStart, 
+          trimEnd: clip.trimEnd,
+          duration: clip.trimEnd - clip.trimStart 
+        },
+        splitPoint: absoluteSplitPoint,
+        clip1: { 
+          id: clip1.id, 
+          trimStart: clip1.trimStart,
+          trimEnd: clip1.trimEnd,
+          startTime: clip1.startTime, 
+          duration: clip1Duration 
+        },
+        clip2: { 
+          id: clip2.id,
+          trimStart: clip2.trimStart,
+          trimEnd: clip2.trimEnd, 
+          startTime: clip2.startTime, 
+          duration: clip2.trimEnd - clip2.trimStart 
+        },
         gap: clip2.startTime - (clip1.startTime + clip1Duration) // Should be 0
       })
       
