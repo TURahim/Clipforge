@@ -175,9 +175,15 @@ export default function VideoPlayer() {
   useEffect(() => {
     if (timelineClips.length === 0) return
     
+    // Debug: Log all clips and their tracks
+    console.log('[VideoPlayer] Syncing at playhead:', playheadPosition)
+    console.log('[VideoPlayer] Timeline clips:', timelineClips.map(c => ({ id: c.id, track: c.track, startTime: c.startTime, filename: c.filename })))
+    
     // Determine active clips for both tracks at current playhead
     const mainClip = getActiveClipForTrack(0, playheadPosition)
     const overlayClip = getActiveClipForTrack(1, playheadPosition)
+    
+    console.log('[VideoPlayer] Active clips - Main:', mainClip?.filename, 'Overlay:', overlayClip?.filename)
     
     // Handle main track
     if (mainClip) {
