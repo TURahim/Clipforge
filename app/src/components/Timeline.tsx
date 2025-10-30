@@ -264,32 +264,15 @@ export default function Timeline() {
               // Calculate Y position based on track
               const trackY = getTrackY(clip.track || 0)
               
-              // NaN-safe width calculation
+              // NaN-safe width calculation (active/visible portion only)
               const clipWidth = Math.max(0, (Number(clip.trimEnd) - Number(clip.trimStart))) * PIXELS_PER_SECOND
               const isSelected = clip.id === selectedClipId
-              
-              const totalClipWidth = clip.duration * PIXELS_PER_SECOND
-              const trimStartWidth = clip.trimStart * PIXELS_PER_SECOND
-              const trimEndWidth = (clip.duration - clip.trimEnd) * PIXELS_PER_SECOND
 
               return (
                 <Group key={clip.id}>
-                  {/* Trimmed-out region (left) - darkened */}
-                  {clip.trimStart > 0 && (
-                    <Rect
-                      x={clipX}
-                      y={trackY}
-                      width={trimStartWidth}
-                      height={TRACK_HEIGHT}
-                      fill="rgba(0,0,0,0.6)"
-                      cornerRadius={4}
-                      onClick={() => handleClipClick(clip.id)}
-                    />
-                  )}
-
-                  {/* Active/visible region */}
+                  {/* Active/visible region (no dark trim overlays - cleaner UI for split clips) */}
                   <Rect
-                    x={clipX + trimStartWidth}
+                    x={clipX}
                     y={trackY}
                     width={clipWidth}
                     height={TRACK_HEIGHT}
@@ -324,8 +307,8 @@ export default function Timeline() {
                       // Calculate new track
                       const newTrack = getTrackFromY(newY)
                       
-                      // Calculate new startTime from X position (accounting for trimStartWidth offset)
-                      const newStartTime = (newX - trimStartWidth) / PIXELS_PER_SECOND
+                      // Calculate new startTime from X position (no offset needed)
+                      const newStartTime = newX / PIXELS_PER_SECOND
                       
                       console.log('[Timeline] Drag ended:', {
                         newX,
@@ -349,7 +332,7 @@ export default function Timeline() {
                       
                       // Snap to correct position
                       const targetTrackY = getTrackY(newTrack)
-                      const targetX = Math.max(0, newStartTime) * PIXELS_PER_SECOND + trimStartWidth
+                      const targetX = Math.max(0, newStartTime) * PIXELS_PER_SECOND
                       e.target.position({ x: targetX, y: targetTrackY })
                     }}
                     onMouseDown={(e) => {
@@ -362,23 +345,10 @@ export default function Timeline() {
                     }}
                   />
 
-                  {/* Trimmed-out region (right) - darkened */}
-                  {clip.trimEnd < clip.duration && (
-                    <Rect
-                      x={clipX + trimStartWidth + clipWidth}
-                      y={trackY}
-                      width={trimEndWidth}
-                      height={TRACK_HEIGHT}
-                      fill="rgba(0,0,0,0.6)"
-                      cornerRadius={4}
-                      onClick={() => handleClipClick(clip.id)}
-                    />
-                  )}
-
                   {/* Left trim handle (in-point) */}
                   {isSelected && (
                     <Rect
-                      x={clipX + trimStartWidth - 5}
+                      x={clipX - 5}
                       y={trackY}
                       width={10}
                       height={TRACK_HEIGHT}
@@ -388,7 +358,7 @@ export default function Timeline() {
                       dragBoundFunc={(pos) => {
                         // Constrain to clip bounds
                         const minX = clipX
-                        const maxX = clipX + trimStartWidth + clipWidth - 10
+                        const maxX = clipX + clipWidth - 10
                         return {
                           x: Math.max(minX, Math.min(maxX, pos.x)),
                           y: trackY, // Keep on same y level relative to Group
@@ -396,8 +366,9 @@ export default function Timeline() {
                       }}
                       onDragEnd={(e: KonvaEventObject<DragEvent>) => {
                         const handleX = e.target.x()
-                        const newTrimStart = (handleX - clipX) / PIXELS_PER_SECOND
-                        const constrained = constrainTrimPoint(newTrimStart, 0, clip.trimEnd - 0.5)
+                        const offsetInClip = (handleX - clipX) / PIXELS_PER_SECOND
+                        const newTrimStart = clip.trimStart + offsetInClip
+                        const constrained = constrainTrimPoint(newTrimStart, clip.trimStart, clip.trimEnd - 0.5)
                         updateClipTrim(clip.id, constrained, clip.trimEnd)
                       }}
                       onMouseEnter={(e) => {
@@ -414,7 +385,7 @@ export default function Timeline() {
                   {/* Right trim handle (out-point) */}
                   {isSelected && (
                     <Rect
-                      x={clipX + trimStartWidth + clipWidth - 5}
+                      x={clipX + clipWidth - 5}
                       y={trackY}
                       width={10}
                       height={TRACK_HEIGHT}
@@ -422,8 +393,8 @@ export default function Timeline() {
                       cornerRadius={2}
                       draggable
                       dragBoundFunc={(pos) => {
-                        const minX = clipX + trimStartWidth + 10
-                        const maxX = clipX + totalClipWidth
+                        const minX = clipX + 10
+                        const maxX = clipX + (clip.duration - clip.trimStart) * PIXELS_PER_SECOND
                         return {
                           x: Math.max(minX, Math.min(maxX, pos.x)),
                           y: trackY, // Keep on same y level relative to Group
@@ -431,7 +402,8 @@ export default function Timeline() {
                       }}
                       onDragEnd={(e: KonvaEventObject<DragEvent>) => {
                         const handleX = e.target.x()
-                        const newTrimEnd = (handleX - clipX) / PIXELS_PER_SECOND
+                        const offsetInClip = (handleX - clipX) / PIXELS_PER_SECOND
+                        const newTrimEnd = clip.trimStart + offsetInClip
                         const constrained = constrainTrimPoint(newTrimEnd, clip.trimStart + 0.5, clip.duration)
                         updateClipTrim(clip.id, clip.trimStart, constrained)
                       }}
@@ -448,7 +420,7 @@ export default function Timeline() {
 
                   {/* Clip label */}
                   <Text
-                    x={clipX + trimStartWidth + 10}
+                    x={clipX + 10}
                     y={trackY + 25}
                     text={clip.filename}
                     fontSize={12}
@@ -460,7 +432,7 @@ export default function Timeline() {
 
                   {/* Duration label */}
                   <Text
-                    x={clipX + trimStartWidth + 10}
+                    x={clipX + 10}
                     y={trackY + TRACK_HEIGHT - 15}
                     text={formatTime(Number(clip.trimEnd) - Number(clip.trimStart))}
                     fontSize={10}
