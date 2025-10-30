@@ -319,23 +319,31 @@ export default function VideoPlayer() {
     }
   }, [volume, isMuted])
 
-  // Sync captions with playhead position
+  // Sync captions with playhead position (check both main and overlay tracks)
   useEffect(() => {
-    if (!currentMainClip) {
+    // Priority: Main track first, then overlay track
+    let activeClipId = currentMainClip
+    let trackName = 'main'
+    
+    if (!activeClipId && currentOverlayClip) {
+      activeClipId = currentOverlayClip
+      trackName = 'overlay'
+    }
+    
+    if (!activeClipId) {
       setCurrentCaption(null)
       return
     }
     
-    const clip = timelineClips.find(c => c.id === currentMainClip)
+    const clip = timelineClips.find(c => c.id === activeClipId)
     if (!clip?.captions || clip.captions.length === 0) {
       setCurrentCaption(null)
       return
     }
     
-    // Debug: Log caption info
+    // Debug: Log caption info (only occasionally to avoid spam)
     if (clip.captions.length > 0 && playheadPosition % 1 < 0.1) {
-      console.log('[Captions] Clip has', clip.captions.length, 'captions')
-      console.log('[Captions] First caption:', clip.captions[0])
+      console.log(`[Captions] ${trackName} track has`, clip.captions.length, 'captions')
     }
     
     // Calculate local time within clip
@@ -347,11 +355,11 @@ export default function VideoPlayer() {
     )
     
     if (caption && caption !== currentCaption) {
-      console.log('[Captions] Showing caption:', caption.text)
+      console.log(`[Captions] Showing ${trackName} caption:`, caption.text)
     }
     
     setCurrentCaption(caption || null)
-  }, [playheadPosition, currentMainClip, timelineClips, currentCaption])
+  }, [playheadPosition, currentMainClip, currentOverlayClip, timelineClips, currentCaption])
 
   const handlePlayPause = () => {
     setPlaying(!isPlaying)
@@ -402,7 +410,7 @@ export default function VideoPlayer() {
         
         {/* Caption Overlay */}
         {currentCaption && (
-          <div className="absolute bottom-20 left-0 right-0 text-center px-4 pointer-events-none">
+          <div className="absolute bottom-4 left-0 right-0 text-center px-4 pointer-events-none">
             <span className="inline-block bg-black bg-opacity-90 text-white text-lg font-semibold px-4 py-2 rounded shadow-lg max-w-4xl">
               {currentCaption.text}
             </span>
