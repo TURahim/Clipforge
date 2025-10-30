@@ -50,6 +50,9 @@ contextBridge.exposeInMainWorld('electron', {
       'save-file-dialog',
       'get-desktop-sources',
       'save-recording',
+      'extract-audio',
+      'read-audio-file',
+      'delete-audio-file',
     ]
     if (validChannels.includes(channel)) {
       return await ipcRenderer.invoke(channel, ...args)

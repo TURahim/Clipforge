@@ -1,3 +1,10 @@
+// Caption interface for time-synced subtitles
+export interface Caption {
+  start: number  // seconds
+  end: number    // seconds
+  text: string
+}
+
 // Core video clip interface
 export interface Clip {
   id: string
@@ -6,6 +13,7 @@ export interface Clip {
   duration: number // in seconds
   thumbnail?: string // base64 or URL
   metadata?: VideoMetadata
+  captions?: Caption[] // AI-generated captions
 }
 
 // Timeline clip (extends Clip with timeline-specific props)

@@ -624,3 +624,77 @@ export async function exportMultipleClips(
     }
   }
 }
+
+/**
+ * Extract audio from video for transcription (Whisper-optimized format)
+ * Outputs mono 16kHz WAV file suitable for OpenAI Whisper API
+ */
+export async function extractAudioForTranscription(
+  videoPath: string
+): Promise<{ success: boolean; audioPath?: string; error?: string }> {
+  try {
+    ensureBinaryPaths()
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to initialize FFmpeg: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    }
+  }
+
+  if (!ffmpegPath) {
+    return { success: false, error: 'FFmpeg binary not initialized' }
+  }
+
+  // Generate temp audio file path
+  const timestamp = Date.now()
+  const audioPath = join(tmpdir(), `clipforge-audio-${timestamp}.wav`)
+
+  console.log('[FFmpeg] Extracting audio for transcription:', videoPath)
+
+  return new Promise((resolve) => {
+    const args = [
+      '-i', videoPath,
+      '-vn', // No video
+      '-acodec', 'pcm_s16le', // PCM 16-bit little-endian
+      '-ar', '16000', // 16kHz sample rate (Whisper optimal)
+      '-ac', '1', // Mono audio
+      '-y', // Overwrite
+      audioPath,
+    ]
+
+    const ffmpeg = spawn(ffmpegPath, args)
+    let stderr = ''
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    ffmpeg.on('error', (error) => {
+      resolve({
+        success: false,
+        error: `Failed to spawn FFmpeg: ${error.message}`,
+      })
+    })
+
+    ffmpeg.on('close', (code) => {
+      if (code !== 0) {
+        resolve({
+          success: false,
+          error: `Audio extraction failed with code ${code}: ${stderr}`,
+        })
+        return
+      }
+
+      if (!existsSync(audioPath)) {
+        resolve({
+          success: false,
+          error: 'Audio file was not created',
+        })
+        return
+      }
+
+      console.log('[FFmpeg] Audio extracted successfully:', audioPath)
+      resolve({ success: true, audioPath })
+    })
+  })
+}

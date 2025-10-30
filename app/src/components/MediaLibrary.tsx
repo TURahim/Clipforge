@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import Toast from './ui/Toast'
 import type { Clip } from '../types'
+import { generateCaptions } from '../utils/captionUtils'
 
 interface ToastState {
   message: string
@@ -12,9 +13,11 @@ export default function MediaLibrary() {
   const clips = useStore((state) => state.clips)
   const addClip = useStore((state) => state.addClip)
   const addToTimeline = useStore((state) => state.addToTimeline)
+  const setClipCaptions = useStore((state) => state.setClipCaptions)
   const [toast, setToast] = useState<ToastState | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [generatingCaptionFor, setGeneratingCaptionFor] = useState<string | null>(null)
 
   const showToast = (message: string, type: ToastState['type']) => {
     setToast({ message, type })
@@ -116,6 +119,24 @@ export default function MediaLibrary() {
     addToTimeline(clip, track)
     const trackName = track === 0 ? 'Main Track' : 'Overlay Track'
     showToast(`Added "${clip.filename}" to ${trackName}`, 'success')
+  }
+
+  const handleAutoCaption = async (clip: Clip) => {
+    setGeneratingCaptionFor(clip.id)
+    showToast('🧠 Generating captions...', 'info')
+    
+    try {
+      const captions = await generateCaptions(clip.id, clip.filePath)
+      setClipCaptions(clip.id, captions)
+      showToast(`✅ Generated ${captions.length} captions for "${clip.filename}"`, 'success')
+    } catch (error) {
+      showToast(
+        `Failed to generate captions: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'error'
+      )
+    } finally {
+      setGeneratingCaptionFor(null)
+    }
   }
 
   const handleDragStart = (e: React.DragEvent, clip: Clip) => {
@@ -232,6 +253,32 @@ export default function MediaLibrary() {
                       Overlay
                     </button>
                   </div>
+                  
+                  {/* Auto-Caption Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleAutoCaption(clip)
+                    }}
+                    disabled={generatingCaptionFor === clip.id}
+                    className="w-full mt-2 px-2 py-1 text-xs bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed rounded transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100"
+                    title="Generate AI captions using Whisper"
+                  >
+                    {generatingCaptionFor === clip.id ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        🧠 Auto-Caption
+                        {clip.captions && ` (${clip.captions.length})`}
+                      </>
+                    )}
+                  </button>
                   
                   <p className="text-xs text-gray-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     Or drag to specific track

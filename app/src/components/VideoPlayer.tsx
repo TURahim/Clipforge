@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore'
 import { VideoController } from '../utils/VideoController'
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { formatTime } from '../utils/timelineUtils'
-import type { TimelineClip } from '../types'
+import type { TimelineClip, Caption } from '../types'
 
 export default function VideoPlayer() {
   // Video element refs for both tracks
@@ -30,6 +30,7 @@ export default function VideoPlayer() {
   const [volume, setVolume] = useState<number>(1)
   const [isMuted, setIsMuted] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
+  const [currentCaption, setCurrentCaption] = useState<Caption | null>(null)
   
   // Debug: Track overlay clip state changes
   useEffect(() => {
@@ -318,6 +319,30 @@ export default function VideoPlayer() {
     }
   }, [volume, isMuted])
 
+  // Sync captions with playhead position
+  useEffect(() => {
+    if (!currentMainClip) {
+      setCurrentCaption(null)
+      return
+    }
+    
+    const clip = timelineClips.find(c => c.id === currentMainClip)
+    if (!clip?.captions || clip.captions.length === 0) {
+      setCurrentCaption(null)
+      return
+    }
+    
+    // Calculate local time within clip
+    const localTime = playheadPosition - clip.startTime + clip.trimStart
+    
+    // Find caption at current time
+    const caption = clip.captions.find(
+      c => localTime >= c.start && localTime <= c.end
+    )
+    
+    setCurrentCaption(caption || null)
+  }, [playheadPosition, currentMainClip, timelineClips])
+
   const handlePlayPause = () => {
     setPlaying(!isPlaying)
   }
@@ -364,6 +389,15 @@ export default function VideoPlayer() {
           <div>Main: {currentMainClip ? '✓' : '✗'}</div>
           <div>Overlay: {currentOverlayClip ? '✓' : '✗'}</div>
         </div>
+        
+        {/* Caption Overlay */}
+        {currentCaption && (
+          <div className="absolute bottom-20 left-0 right-0 text-center px-4 pointer-events-none">
+            <span className="inline-block bg-black bg-opacity-90 text-white text-lg font-semibold px-4 py-2 rounded shadow-lg max-w-4xl">
+              {currentCaption.text}
+            </span>
+          </div>
+        )}
         
         {/* Error Overlay */}
         {error && (

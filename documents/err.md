@@ -1,90 +1,127 @@
-Implement Picture-in-Picture (PiP) Playback View
+🧠 Cursor PM Prompt – Implement AI Auto-Captioning via OpenAI Whisper
 
 Context:
-The timeline system now supports two tracks — the main track (index 0) and the overlay track (index 1) — and clips can be correctly added, moved, and trimmed on both.
+ClipForge now supports full import, trimming, multi-track timeline, playback, and export.
+The next step is to add a lightweight AI Auto-Caption feature powered by OpenAI Whisper, allowing users to automatically generate subtitles for any imported clip and view them in real-time on the player.
 
-However, the video player currently only displays the main track’s clip. When both tracks contain clips (e.g., one in the main track and one in the overlay), playback ignores the overlay and shows only the main clip.
+🧩 Goal
 
-We now want to render a Picture-in-Picture (PiP) view in the player — showing the overlay clip as a smaller, inset video layer on top of the main one during playback.
+Implement an “Auto-Caption” workflow where:
 
-🧠 Goal
+The user selects a clip (from Media Library or Timeline).
 
-Enable the player to composite both video layers during playback:
+Clicks a button → “🧠 Auto-Caption Clip”.
 
-Main track → fills the full video player (base layer).
+The app sends the clip’s audio to OpenAI Whisper API for transcription.
 
-Overlay track → appears as a smaller, movable/resizable inset (top-right corner by default).
+The returned transcript + timestamps are stored in the clip object:
 
-Both play in sync (same current time, play/pause, trimming respected).
+clip.captions = [{ start: number, end: number, text: string }]
 
-Export behavior remains unchanged (only affects preview, not final render yet).
 
-🧩 What you’ll need to look into
+Captions display as synchronized subtitles in the VideoPlayer during playback.
 
-VideoPlayer.tsx logic:
+When exporting, captions remain preview-only (no burn-in yet).
 
-It currently likely renders a single <video> element or canvas context bound to the active clip.
+🧠 Implementation Plan
+1. Add Auto-Caption Button
 
-Update it to handle two concurrent video elements:
+File: src/components/ExportControls.tsx or a new CaptionButton.tsx
 
-One for mainTrackClip
+Add a new toolbar button:
 
-One for overlayTrackClip
+<Button onClick={() => generateCaptions(selectedClip)} className="ml-2">
+  🧠 Auto-Caption
+</Button>
 
-They should share the same playback controls and time position from the store (playheadPosition, isPlaying).
 
-Sync logic:
+Disabled if no clip is selected.
 
-When play/pause triggers, both videos should respond together.
+2. Implement generateCaptions()
 
-On seek/scrub, set both video.currentTime values to match the playhead.
+Location: new helper under src/utils/captionUtils.ts
 
-UI / styling:
+Extract audio from the selected clip using FFmpeg:
 
-Use absolute positioning to render the overlay clip inside the same player container.
+ffmpeg -i <input> -vn -acodec pcm_s16le -ar 16000 -ac 1 <temp.wav>
 
-Example (React JSX hint):
 
-<div className="relative w-full h-full">
-  <video ref={mainRef} className="w-full h-full object-contain" />
-  <video
-    ref={overlayRef}
-    className="absolute bottom-4 right-4 w-1/4 h-auto rounded-lg shadow-lg border border-gray-600"
-  />
+Send that audio to the OpenAI Whisper API:
+
+import OpenAI from 'openai'
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+const transcript = await openai.audio.transcriptions.create({
+  file: fs.createReadStream(tempFile),
+  model: 'whisper-1',
+  response_format: 'verbose_json',
+})
+
+
+Parse Whisper response → extract words/timestamps → normalize into SRT-style segments.
+
+3. Store Captions in Zustand Store
+
+File: src/store/useStore.ts
+
+Extend clip object:
+
+interface TimelineClip {
+  ...
+  captions?: { start: number; end: number; text: string }[]
+}
+
+
+Add store action:
+
+setClipCaptions: (clipId, captions) =>
+  set((state) => ({
+    timelineClips: state.timelineClips.map((c) =>
+      c.id === clipId ? { ...c, captions } : c
+    ),
+  }))
+
+4. Render Captions in VideoPlayer
+
+File: src/components/VideoPlayer.tsx
+
+Add a <div> overlay above the video elements:
+
+<div className="absolute bottom-8 w-full text-center text-white text-lg font-semibold drop-shadow-lg">
+  {currentCaption && <span>{currentCaption.text}</span>}
 </div>
 
 
-Zustand store usage:
+Compute currentCaption in a useEffect watching playheadPosition and activeClip?.captions.
 
-You can derive active clips for each track:
+5. Add Toast + Progress Indicator
 
-const mainClip = timelineClips.find(c => c.track === 0)
-const overlayClip = timelineClips.find(c => c.track === 1)
+Show “Generating captions…” while processing and “✅ Captions added” on success.
 
+🧩 Testing Scenarios
 
-Ensure VideoPlayer updates both refs when these change.
+Single clip with clear speech → captions align in playback.
 
-Edge cases:
+Deleting clip → captions removed.
 
-Only one clip present → behave as before.
+Pausing / scrubbing → subtitles update in real time.
 
-Overlay clip without main → overlay fills the frame.
+Empty timeline → no overlay.
 
-When deleting clips, reset inactive players.
+Invalid audio → error toast “Transcription failed”.
 
 ✅ Definition of Done
 
-When both tracks contain clips:
+Selecting a clip and pressing Auto-Caption sends it to Whisper and adds subtitles.
 
-The player displays the main clip full-size.
+Subtitles appear time-synced during playback.
 
-The overlay clip appears as a small PiP in the corner (configurable in future).
+No crash on missing audio or large files.
 
-Both videos stay in sync on play, pause, and scrubbing.
+Export behavior unchanged.
 
-When only one track is active, the player defaults to that track’s clip.
-
-The rest of the editing pipeline (trimming, exporting) remains unchanged.
+Whisper API key read from .env → OPENAI_API_KEY.
 
 Hint:
-If performance becomes an issue with two <video> elements, consider a <canvas> compositing approach later. For now, focus on functional two-layer playback using synchronized <video> tags.
+If Whisper response is word-level, batch into ~2–3-second caption chunks for smoother reading.
+Later, we can add a “Burn-in Captions on Export” option using FFmpeg subtitles filter.

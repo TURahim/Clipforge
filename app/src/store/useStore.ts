@@ -81,6 +81,7 @@ interface AppState {
   zoomIn: () => void
   zoomOut: () => void
   toggleSnap: () => void
+  setClipCaptions: (clipId: string, captions: import('../types').Caption[]) => void
 }
 
 const storeConfig: StateCreator<AppState> = (set) => ({
@@ -494,6 +495,17 @@ const storeConfig: StateCreator<AppState> = (set) => ({
   
   toggleSnap: () =>
     set((state) => ({ snapEnabled: !state.snapEnabled })),
+  
+  // Caption management
+  setClipCaptions: (clipId: string, captions: import('../types').Caption[]) =>
+    set((state) => ({
+      clips: state.clips.map((c) =>
+        c.id === clipId ? { ...c, captions } : c
+      ),
+      timelineClips: state.timelineClips.map((c) =>
+        c.id === clipId ? { ...c, captions } : c
+      ),
+    })),
 })
 
 export const useStore = create<AppState>(storeConfig)

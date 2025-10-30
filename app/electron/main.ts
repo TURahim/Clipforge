@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol } from 'electron'
 import { join } from 'path'
 import { readFile, stat } from 'fs/promises'
+import { readFileSync, unlinkSync } from 'fs'
 import { openFileDialog, validateVideoFile } from './handlers/file.handler'
-import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips, diagnoseFfmpeg } from './handlers/ffmpeg.handler'
+import { extractMetadata, generateThumbnail, exportSingleClip, exportMultipleClips, diagnoseFfmpeg, extractAudioForTranscription } from './handlers/ffmpeg.handler'
 import { setupRecordingHandlers } from './handlers/recording.handler'
 import type { TimelineClip } from '../src/types'
 
@@ -224,6 +225,47 @@ function registerIPCHandlers() {
       return {
         success: false,
         error: `Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      }
+    }
+  })
+
+  // Extract audio for transcription (AI captions)
+  ipcMain.handle('extract-audio', async (_event, videoPath: string) => {
+    try {
+      return await extractAudioForTranscription(videoPath)
+    } catch (error) {
+      return {
+        success: false,
+        error: `Audio extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      }
+    }
+  })
+
+  // Read audio file as ArrayBuffer
+  ipcMain.handle('read-audio-file', async (_event, audioPath: string) => {
+    try {
+      const buffer = readFileSync(audioPath)
+      return {
+        success: true,
+        data: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to read audio file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      }
+    }
+  })
+
+  // Delete temp audio file
+  ipcMain.handle('delete-audio-file', async (_event, audioPath: string) => {
+    try {
+      unlinkSync(audioPath)
+      return { success: true }
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to delete audio file: ${error instanceof Error ? error.message : 'Unknown error'}`,
       }
     }
   })
