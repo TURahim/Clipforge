@@ -956,14 +956,14 @@ export async function exportUnifiedPiP(
       if (overlaySrtPath) {
         // Overlay captions first (will appear above main captions)
         const escapedPath = escapeFilterPath(overlaySrtPath)
-        filterParts.push(`[${videoOutput}]subtitles='${escapedPath}':force_style='Alignment=2,MarginV=80,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Outline=1,Shadow=1'[outv1]`)
+        filterParts.push(`[${videoOutput}]subtitles='${escapedPath}':force_style='Alignment=2,MarginV=80,FontSize=12,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=0,Outline=2,Shadow=0'[outv1]`)
         videoOutput = 'outv1'
       }
       
       if (mainSrtPath) {
-        // Main captions at bottom
+        // Main captions at bottom (YouTube-style auto-caption look)
         const escapedPath = escapeFilterPath(mainSrtPath)
-        filterParts.push(`[${videoOutput}]subtitles='${escapedPath}':force_style='Alignment=2,MarginV=16,FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=1,Outline=1,Shadow=1'[outv2]`)
+        filterParts.push(`[${videoOutput}]subtitles='${escapedPath}':force_style='Alignment=2,MarginV=16,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BackColour=&H80000000,Bold=0,Outline=2,Shadow=0'[outv2]`)
         videoOutput = 'outv2'
       }
     }
