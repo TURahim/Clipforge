@@ -36,6 +36,11 @@ export default function Timeline() {
   // Diagnostic logging
   console.log('[Timeline] typeof addToTimeline =', typeof addToTimeline)
   console.log('[Timeline] store keys:', Object.keys(useStore.getState()))
+  
+  // Debug: Log selectedClipId changes
+  useEffect(() => {
+    console.log('[Timeline] selectedClipId changed:', { selectedClipId, timelineClipsCount: timelineClips.length })
+  }, [selectedClipId, timelineClips.length])
 
   const containerRef = useRef<HTMLDivElement>(null)
   
@@ -68,6 +73,7 @@ export default function Timeline() {
   const timeMarkers = generateTimeMarkers(totalDuration)
 
   const handleClipClick = (clipId: string) => {
+    console.log('[Timeline] handleClipClick called:', { clipId, currentSelectedClipId: selectedClipId })
     setSelectedClip(clipId)
   }
 
