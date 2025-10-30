@@ -30,7 +30,8 @@ export default function VideoPlayer() {
   const [volume, setVolume] = useState<number>(1)
   const [isMuted, setIsMuted] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentCaption, setCurrentCaption] = useState<Caption | null>(null)
+  const [currentMainCaption, setCurrentMainCaption] = useState<Caption | null>(null)
+  const [currentOverlayCaption, setCurrentOverlayCaption] = useState<Caption | null>(null)
   
   // Debug: Track overlay clip state changes
   useEffect(() => {
@@ -319,31 +320,17 @@ export default function VideoPlayer() {
     }
   }, [volume, isMuted])
 
-  // Sync captions with playhead position (check both main and overlay tracks)
+  // Sync main track captions with playhead position
   useEffect(() => {
-    // Priority: Main track first, then overlay track
-    let activeClipId = currentMainClip
-    let trackName = 'main'
-    
-    if (!activeClipId && currentOverlayClip) {
-      activeClipId = currentOverlayClip
-      trackName = 'overlay'
-    }
-    
-    if (!activeClipId) {
-      setCurrentCaption(null)
+    if (!currentMainClip) {
+      setCurrentMainCaption(null)
       return
     }
     
-    const clip = timelineClips.find(c => c.id === activeClipId)
+    const clip = timelineClips.find(c => c.id === currentMainClip)
     if (!clip?.captions || clip.captions.length === 0) {
-      setCurrentCaption(null)
+      setCurrentMainCaption(null)
       return
-    }
-    
-    // Debug: Log caption info (only occasionally to avoid spam)
-    if (clip.captions.length > 0 && playheadPosition % 1 < 0.1) {
-      console.log(`[Captions] ${trackName} track has`, clip.captions.length, 'captions')
     }
     
     // Calculate local time within clip
@@ -354,12 +341,40 @@ export default function VideoPlayer() {
       c => localTime >= c.start && localTime <= c.end
     )
     
-    if (caption && caption !== currentCaption) {
-      console.log(`[Captions] Showing ${trackName} caption:`, caption.text)
+    if (caption && caption !== currentMainCaption) {
+      console.log('[Captions] Main track caption:', caption.text)
     }
     
-    setCurrentCaption(caption || null)
-  }, [playheadPosition, currentMainClip, currentOverlayClip, timelineClips, currentCaption])
+    setCurrentMainCaption(caption || null)
+  }, [playheadPosition, currentMainClip, timelineClips, currentMainCaption])
+
+  // Sync overlay track captions with playhead position
+  useEffect(() => {
+    if (!currentOverlayClip) {
+      setCurrentOverlayCaption(null)
+      return
+    }
+    
+    const clip = timelineClips.find(c => c.id === currentOverlayClip)
+    if (!clip?.captions || clip.captions.length === 0) {
+      setCurrentOverlayCaption(null)
+      return
+    }
+    
+    // Calculate local time within clip
+    const localTime = playheadPosition - clip.startTime + clip.trimStart
+    
+    // Find caption at current time
+    const caption = clip.captions.find(
+      c => localTime >= c.start && localTime <= c.end
+    )
+    
+    if (caption && caption !== currentOverlayCaption) {
+      console.log('[Captions] Overlay track caption:', caption.text)
+    }
+    
+    setCurrentOverlayCaption(caption || null)
+  }, [playheadPosition, currentOverlayClip, timelineClips, currentOverlayCaption])
 
   const handlePlayPause = () => {
     setPlaying(!isPlaying)
@@ -408,11 +423,20 @@ export default function VideoPlayer() {
           <div>Overlay: {currentOverlayClip ? '✓' : '✗'}</div>
         </div>
         
-        {/* Caption Overlay */}
-        {currentCaption && (
-          <div className="absolute bottom-4 left-0 right-0 text-center px-4 pointer-events-none">
+        {/* Main Track Caption (Bottom) */}
+        {currentMainCaption && (
+          <div className="absolute bottom-4 left-0 right-0 text-center px-4 pointer-events-none z-20">
             <span className="inline-block bg-black bg-opacity-90 text-white text-lg font-semibold px-4 py-2 rounded shadow-lg max-w-4xl">
-              {currentCaption.text}
+              {currentMainCaption.text}
+            </span>
+          </div>
+        )}
+        
+        {/* Overlay Track Caption (Top) */}
+        {currentOverlayCaption && (
+          <div className="absolute top-16 left-0 right-0 text-center px-4 pointer-events-none z-20">
+            <span className="inline-block bg-gradient-to-r from-purple-900 to-pink-900 bg-opacity-90 text-white text-lg font-semibold px-4 py-2 rounded shadow-lg max-w-4xl border-2 border-purple-400">
+              {currentOverlayCaption.text}
             </span>
           </div>
         )}
