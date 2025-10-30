@@ -1,6 +1,6 @@
 # ClipForge
 
-A lightweight desktop video editor built with Electron, React, and FFmpeg.
+A powerful desktop video editor with screen recording, AI captions, and multi-track PiP editing. Built with Electron, React, and FFmpeg.
 
 ![ClipForge](https://img.shields.io/badge/version-0.1.0-blue)
 ![Electron](https://img.shields.io/badge/electron-39.0.0-blue)
@@ -8,15 +8,54 @@ A lightweight desktop video editor built with Electron, React, and FFmpeg.
 
 ## 🎬 Features
 
+### 🎥 Recording
+- **Screen Recording** - Capture your screen with audio support
+- **Webcam Recording** - Record from your camera with audio
+- **Picture-in-Picture (PiP) Recording** - Record screen and webcam simultaneously
+- **Combined Tracks** - Automatic multi-track timeline for combined recordings
+
+### 📹 Video Import & Library
 - **Video Import** - Import videos via drag-and-drop or file picker (MP4, MOV, AVI, MKV, WEBM)
 - **Media Library** - Visual library with thumbnails and metadata display
-- **Timeline Editing** - Canvas-based timeline with drag-and-drop clip placement
-- **Video Playback** - Real-time video preview with play/pause controls and audio
-- **Draggable Playhead** - Interactive scrubbing through timeline with real-time sync
-- **Trim Clips** - Set in/out points with visual handles and trim indicators
-- **Multi-Clip Export** - Export single or multiple clips with trimming support
-- **Progress Tracking** - Real-time export progress with percentage display
-- **FFmpeg Integration** - Professional video processing powered by FFmpeg (Apple Silicon optimized)
+- **Quick Preview** - Thumbnail generation for instant visual reference
+
+### ✂️ Timeline Editing
+- **Multi-Track Timeline** - Main track + overlay track for PiP workflows
+- **Drag & Drop** - Add clips to timeline with drag-and-drop
+- **Track Switching** - Move clips between main and overlay tracks
+- **Split Clips** - Split clips at playhead position (keyboard: `S`)
+- **Delete Clips** - Remove clips from timeline (keyboard: `Del`)
+- **Trim Clips** - Visual trim handles with Set In/Out buttons
+- **Timeline Zoom** - Zoom in/out for precise editing (100%, 200%, 400%)
+- **Snap to Grid** - Toggle snap for easier clip alignment
+- **Horizontal Repositioning** - Drag clips left/right to adjust timing
+
+### 🎬 Playback & Preview
+- **Real-Time Playback** - Play/pause with audio support (keyboard: `Space`)
+- **Draggable Playhead** - Interactive scrubbing through timeline
+- **Multi-Clip Transitions** - Seamless playback across multiple clips
+- **PiP Preview** - Live preview of main + overlay tracks with correct positioning
+- **Volume Controls** - Adjust volume and mute/unmute
+
+### 🤖 AI-Powered Features
+- **Auto-Captioning** - AI-generated captions using OpenAI Whisper
+- **Word-Level Timing** - Precise caption timing with word-level timestamps
+- **Dual-Track Captions** - Separate captions for main and overlay videos
+- **Smart Chunking** - Readable caption chunks with sentence boundary detection
+
+### 📤 Export & Output
+- **Unified PiP Export** - Export main + overlay + captions in one video
+- **Resolution Options** - 4K, 1080p, 720p, 480p, or source quality
+- **Caption Burn-In** - Auto-caption styling (bottom-aligned, readable)
+- **Smart Composition** - Dynamic overlay positioning (22% size, bottom-right)
+- **Multi-Clip Support** - Export multiple clips with trimming
+- **Progress Tracking** - Real-time export progress with time estimates
+
+### 🔧 Technical Features
+- **FFmpeg Integration** - Professional video processing (Apple Silicon optimized)
+- **Canvas-Based Timeline** - Smooth performance with React-Konva
+- **NaN-Safe Calculations** - Robust math with edge case handling
+- **Keyboard Shortcuts** - Efficient editing with hotkeys
 - **Cross-Platform** - Works on macOS, Windows, and Linux
 
 ## 📦 Installation
@@ -145,7 +184,8 @@ clipforge/app/
 │   ├── preload.ts             # IPC bridge (secure communication)
 │   └── handlers/              # IPC handlers
 │       ├── file.handler.ts    # File dialog & validation
-│       └── ffmpeg.handler.ts  # Video processing & export
+│       ├── ffmpeg.handler.ts  # Video processing, export & captions
+│       └── recording.handler.ts # Screen/webcam recording
 │
 ├── src/                       # React renderer process
 │   ├── App.tsx               # Root component
@@ -153,10 +193,13 @@ clipforge/app/
 │   ├── index.css             # Global styles + Tailwind
 │   │
 │   ├── components/           # React components
-│   │   ├── MediaLibrary.tsx  # Media library panel
-│   │   ├── VideoPlayer.tsx   # Video player with playback controls
-│   │   ├── Timeline.tsx      # Interactive timeline with trim handles
-│   │   ├── ExportControls.tsx # Export UI & trim controls
+│   │   ├── MediaLibrary.tsx  # Media library panel with auto-caption
+│   │   ├── VideoPlayer.tsx   # Dual video player (main + overlay PiP)
+│   │   ├── Timeline.tsx      # Multi-track timeline with trim handles
+│   │   ├── ExportControls.tsx # Export UI, trim controls & resolution
+│   │   ├── RecordingControls.tsx # Screen/webcam recording UI
+│   │   ├── SourcePicker.tsx  # Screen source selection for recording
+│   │   ├── TimelineToolbar.tsx # Timeline zoom & snap controls
 │   │   └── ui/               # Reusable UI components
 │   │       ├── Toast.tsx     # Notification toasts
 │   │       └── ProgressBar.tsx # Progress indicator
@@ -168,7 +211,9 @@ clipforge/app/
 │   │   ├── VideoController.ts # Video controller abstraction
 │   │   ├── exportUtils.ts    # FFmpeg command builders
 │   │   ├── trimUtils.ts      # Trim validation utilities
-│   │   ├── timelineUtils.ts  # Timeline calculations
+│   │   ├── timelineUtils.ts  # Timeline calculations & zoom
+│   │   ├── resolutionPresets.ts # Export resolution presets
+│   │   ├── captionUtils.ts   # OpenAI Whisper integration
 │   │   └── __tests__/        # Unit tests
 │   │
 │   ├── types/                # TypeScript definitions
@@ -192,7 +237,29 @@ clipforge/app/
 
 ## 🎯 Usage Guide
 
-### 1. Import Videos
+### 1. Recording Videos
+
+**Screen Recording**
+- Select **"Screen"** mode in the recording panel
+- Click **"Start Recording"**
+- Choose which window/screen to capture
+- Click **"Stop Recording"** when done
+- Recording auto-imports to Media Library
+
+**Webcam Recording**
+- Select **"Webcam"** mode in the recording panel
+- Grant camera/microphone permissions if prompted
+- Click **"Start Recording"**
+- Click **"Stop Recording"** when done
+
+**Picture-in-Picture (Screen + Webcam)**
+- Select **"Both (PiP)"** mode
+- Click **"Start Recording"**
+- Both screen and webcam record simultaneously
+- Automatically creates a multi-track timeline
+- Perfect for tutorials, presentations, and demos
+
+### 2. Import Videos
 
 **Method A: File Picker**
 - Click the **"Import Video"** button in the Media Library
@@ -201,38 +268,101 @@ clipforge/app/
 
 **Method B: Drag & Drop**
 - Drag video files from Finder/Explorer
-- Drop them anywhere in the Media Library panel
+- Drop them directly onto the timeline
+- Drop near the top for Main Track, bottom for Overlay Track
 - Multiple files can be dropped at once
 
-### 2. Add Clips to Timeline
+### 3. AI Auto-Captioning
 
-- Click any clip in the Media Library
-- The clip will be added to the timeline automatically
-- Clips are arranged sequentially
-- Drag the red playhead to scrub through the timeline
+- Hover over any clip in the Media Library
+- Click the **"🧠 Auto-Caption"** button
+- Wait for AI transcription (powered by OpenAI Whisper)
+- Captions appear automatically in the preview
+- Captions are burned into exported videos
 
-### 3. Play & Preview
+**Requirements:**
+- Create a `.env.local` file in `/app` directory
+- Add: `VITE_OPENAI_API_KEY=your_api_key_here`
 
-- Click the **Play** button to preview your video
-- The playhead moves in sync with video playback
-- Drag the playhead to scrub to any position
-- Video automatically transitions between clips
+### 4. Timeline Editing
 
-### 4. Trim Clips
+**Add Clips**
+- Click clips in Media Library to add to timeline
+- Or drag clips directly onto timeline tracks
 
-- Select a clip on the timeline by clicking it
-- Use the **Set In** and **Set Out** buttons to trim at the playhead position
-- Or drag the orange trim handles on the timeline
-- Visual indicators show the trimmed regions
+**Multi-Track Editing**
+- **Main Track** (top) - Primary video content
+- **Overlay Track** (bottom) - PiP webcam/overlay
+- Drag clips vertically to switch tracks
 
-### 5. Export Video
+**Split Clips**
+- Select clip → Move playhead → Press `S` or click **Split**
+- Creates two separate clips at playhead position
 
-- Click the **"Export Video"** button at the bottom
+**Delete Clips**
+- Select clip → Press `Del` or click **Delete**
+
+**Trim Clips**
+- Select clip on timeline
+- Press **Set In** to trim start at playhead
+- Press **Set Out** to trim end at playhead
+- Or drag orange trim handles on timeline edges
+
+**Reposition Clips**
+- Drag clips horizontally to adjust timing
+- Use zoom controls for precision
+
+**Timeline Zoom**
+- Click **zoom buttons** (100%, 200%, 400%)
+- Or use mouse wheel (if enabled)
+
+### 5. Play & Preview
+
+- Click the **Play** button or press `Space`
+- Playhead syncs with video playback
+- Drag playhead to scrub to any position
+- PiP preview shows main + overlay composition
+- Captions appear at bottom of preview
+
+### 6. Export Video
+
+**Basic Export**
+- Click **"Export Video"** button
 - Choose output location and filename
-- Watch the progress bar as your video exports
-- The exported MP4 will respect all trim points
+- Watch real-time progress with time estimates
+
+**Resolution Options**
+- Select resolution: **Source**, **4K**, **1080p**, **720p**, **480p**
+- Source preserves original quality
+- Lower resolutions reduce file size
+
+**What Gets Exported:**
+- ✅ All clips on timeline (main + overlay)
+- ✅ Trim points respected
+- ✅ PiP composition (overlay in bottom-right)
+- ✅ Auto-captions burned in (if generated)
+- ✅ Audio from both tracks mixed
 
 ## 🔧 Configuration
+
+### AI Auto-Captioning Setup
+
+To enable AI auto-captioning, you need an OpenAI API key:
+
+1. Create a `.env.local` file in the `/app` directory:
+```bash
+cd clipforge/app
+touch .env.local
+```
+
+2. Add your OpenAI API key:
+```bash
+VITE_OPENAI_API_KEY=sk-your-api-key-here
+```
+
+3. Restart the app (if running)
+
+**Note:** The API key is only used in the renderer process (client-side). For production apps, consider implementing a backend service to handle API calls securely.
 
 ### Build Configuration
 
@@ -248,6 +378,7 @@ FFmpeg is bundled via `@ffmpeg-installer/ffmpeg` and `@ffprobe-installer/ffprobe
 - **Audio codec:** AAC
 - **Container:** MP4
 - **Apple Silicon Support:** Native ARM64 binaries included
+- **Complex Filters:** Multi-track compositing, scaling, overlay, caption burn-in
 
 ## 📝 Development Progress
 
@@ -282,7 +413,7 @@ FFmpeg is bundled via `@ffmpeg-installer/ffmpeg` and `@ffprobe-installer/ffprobe
 - [x] **PR #6:** Trim Functionality
   - ✅ Draggable trim handles on timeline
   - ✅ Set In/Out buttons with playhead position
-  - ✅ Visual trim indicators (darkened regions)
+  - ✅ Visual trim indicators
   - ✅ Trim validation and constraints
   - ✅ Reset trim functionality
 - [x] **PR #7:** Export Pipeline
@@ -291,11 +422,69 @@ FFmpeg is bundled via `@ffmpeg-installer/ffmpeg` and `@ffprobe-installer/ffprobe
   - ✅ Real-time progress tracking
   - ✅ Temporary file cleanup
   - ✅ Comprehensive unit tests
+- [x] **PR #8:** App Packaging & Distribution
+  - ✅ electron-builder configuration
+  - ✅ macOS DMG packaging
+  - ✅ FFmpeg binary bundling
+  - ✅ Production build optimization
+- [x] **PR #9:** Bug Fixes & UI Polish
+  - ✅ Fixed production build issues
+  - ✅ Improved error handling
+  - ✅ Enhanced UI responsiveness
+  - ✅ Keyboard shortcuts
 
-### 🚧 In Progress
-- [ ] **PR #8:** App Packaging & Distribution
-- [ ] **PR #9:** Bug Fixes & UI Polish
-- [ ] **PR #10:** Documentation & Demo Video
+### ✅ Completed (Post-MVP Core Features)
+- [x] **PR #11:** Screen Recording
+  - ✅ desktopCapturer integration
+  - ✅ Screen source selection
+  - ✅ Audio capture support
+  - ✅ Recording controls UI
+- [x] **PR #12:** Webcam Recording
+  - ✅ MediaRecorder API integration
+  - ✅ Camera/microphone permissions
+  - ✅ Recording controls
+  - ✅ Auto-import to library
+- [x] **PR #13:** Combined Screen + Webcam Recording (PiP)
+  - ✅ Simultaneous screen + webcam capture
+  - ✅ Automatic multi-track timeline creation
+  - ✅ Recording mode selector
+  - ✅ Timer and status indicators
+- [x] **PR #14:** Timeline Operations (Split, Delete)
+  - ✅ Split clip at playhead
+  - ✅ Delete selected clip
+  - ✅ Keyboard shortcuts (S, Del)
+  - ✅ Gap-free splitting logic
+- [x] **PR #15:** Multi-Track Timeline
+  - ✅ Main track + overlay track
+  - ✅ Vertical drag between tracks
+  - ✅ Track-specific rendering
+  - ✅ Dual video player (main + overlay)
+- [x] **PR #16:** Timeline Zoom & Snap
+  - ✅ 100%, 200%, 400% zoom levels
+  - ✅ Dynamic pixels-per-second calculation
+  - ✅ Snap to grid toggle
+  - ✅ Zoom controls UI
+- [x] **PR #17:** Export Resolution Options
+  - ✅ Resolution presets (4K, 1080p, 720p, 480p, Source)
+  - ✅ FFmpeg scaling filters
+  - ✅ Resolution selector UI
+  - ✅ Aspect ratio preservation
+- [x] **PR #18:** AI Auto-Captioning
+  - ✅ OpenAI Whisper integration
+  - ✅ Audio extraction from video
+  - ✅ Word-level timestamp parsing
+  - ✅ Smart caption chunking
+  - ✅ Dual-track caption display
+  - ✅ Caption styling and positioning
+- [x] **PR #19:** Unified PiP Export
+  - ✅ Multi-track compositing
+  - ✅ Dynamic overlay positioning (bottom-right, 22%)
+  - ✅ Caption burn-in (FFmpeg subtitles filter)
+  - ✅ Audio mixing from both tracks
+  - ✅ Complex FFmpeg filter graphs
+
+### 🎉 Feature Complete
+All core features implemented and tested!
 
 ## 🐛 Known Issues
 
@@ -325,23 +514,37 @@ Code signing will be added in a future release.
 
 ## 🚀 Roadmap
 
-### v0.2.0 - Timeline & Playback
-- Interactive timeline with React-Konva
-- Video player with play/pause/seek
-- Clip trimming with visual handles
-- Multi-clip export support
+### ✅ v0.2.0 - Core Features (Completed)
+- ✅ Interactive timeline with React-Konva
+- ✅ Video player with play/pause/seek
+- ✅ Clip trimming with visual handles
+- ✅ Multi-clip export support
 
-### v0.3.0 - Advanced Features
-- Transitions between clips
-- Basic effects (fade in/out)
-- Audio level adjustment
-- Keyboard shortcuts
+### ✅ v0.3.0 - Advanced Features (Completed)
+- ✅ Screen & webcam recording
+- ✅ Multi-track timeline (PiP)
+- ✅ AI auto-captioning
+- ✅ Keyboard shortcuts
+- ✅ Timeline zoom & snap
+- ✅ Resolution options
 
-### v1.0.0 - Production Release
-- Code signing for macOS & Windows
-- Auto-update support
-- Optimized performance
-- Comprehensive documentation
+### 🎯 v1.0.0 - Production Release (Planned)
+- [ ] Code signing for macOS & Windows
+- [ ] Auto-update support
+- [ ] Transitions between clips
+- [ ] Basic effects (fade in/out)
+- [ ] Audio level adjustment
+- [ ] Performance optimizations
+- [ ] Comprehensive documentation
+- [ ] Demo videos & tutorials
+
+### 🔮 Future Enhancements
+- [ ] Text overlays & titles
+- [ ] More export formats (GIF, different codecs)
+- [ ] Cloud storage integration
+- [ ] Collaborative editing
+- [ ] Mobile companion app
+- [ ] Plugin system
 
 ## 🤝 Contributing
 
@@ -368,7 +571,19 @@ MIT License - see LICENSE file for details
 - [Zustand](https://github.com/pmndrs/zustand) - State management
 
 ### Development Timeline
-Built as part of a 3-day MVP challenge (October 27-29, 2025).
+- **MVP Phase:** October 27-29, 2025 (3 days)
+- **Core Features:** October 30 - November 1, 2025 (3 days)
+- **Polish & Testing:** Ongoing
+
+### ⌨️ Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `Space` | Play / Pause |
+| `S` | Split clip at playhead |
+| `Del` | Delete selected clip |
+| `+/-` | Zoom in / out (planned) |
+| `[` / `]` | Set In / Out point (planned) |
 
 ## 📞 Support
 
