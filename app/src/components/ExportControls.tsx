@@ -21,6 +21,15 @@ export default function ExportControls() {
   const [selectedResolution, setSelectedResolution] = useState<string>('source')
   
   const selectedClip = timelineClips.find(c => c.id === selectedClipId)
+  
+  // Debug: Log selectedClip changes
+  useEffect(() => {
+    console.log('[ExportControls] selectedClip changed:', { 
+      selectedClipId, 
+      selectedClip: selectedClip ? { id: selectedClip.id, filename: selectedClip.filename } : null,
+      timelineClipsCount: timelineClips.length 
+    })
+  }, [selectedClipId, selectedClip, timelineClips.length])
 
   const showToast = (message: string, type: ToastState['type']) => {
     setToast({ message, type })
@@ -135,28 +144,68 @@ export default function ExportControls() {
   )
   
   const handleSetInPoint = () => {
-    if (!selectedClip) return
+    console.log('[ExportControls] handleSetInPoint called:', { 
+      selectedClip, 
+      playheadPosition, 
+      selectedClipId 
+    })
+    
+    if (!selectedClip) {
+      console.warn('[ExportControls] No selected clip for Set In')
+      showToast('No clip selected', 'error')
+      return
+    }
     
     // Calculate the time within the selected clip
     const clipLocalTime = playheadPosition - selectedClip.startTime
     const newTrimStart = Math.max(0, Math.min(clipLocalTime, selectedClip.trimEnd - 0.5))
+    
+    console.log('[ExportControls] Setting in-point:', {
+      clipLocalTime,
+      newTrimStart,
+      currentTrimStart: selectedClip.trimStart,
+      currentTrimEnd: selectedClip.trimEnd
+    })
     
     updateClipTrim(selectedClip.id, newTrimStart, selectedClip.trimEnd)
     showToast('In-point set', 'success')
   }
   
   const handleSetOutPoint = () => {
-    if (!selectedClip) return
+    console.log('[ExportControls] handleSetOutPoint called:', { 
+      selectedClip, 
+      playheadPosition, 
+      selectedClipId 
+    })
+    
+    if (!selectedClip) {
+      console.warn('[ExportControls] No selected clip for Set Out')
+      showToast('No clip selected', 'error')
+      return
+    }
     
     const clipLocalTime = playheadPosition - selectedClip.startTime
     const newTrimEnd = Math.max(selectedClip.trimStart + 0.5, Math.min(clipLocalTime, selectedClip.duration))
+    
+    console.log('[ExportControls] Setting out-point:', {
+      clipLocalTime,
+      newTrimEnd,
+      currentTrimStart: selectedClip.trimStart,
+      currentTrimEnd: selectedClip.trimEnd
+    })
     
     updateClipTrim(selectedClip.id, selectedClip.trimStart, newTrimEnd)
     showToast('Out-point set', 'success')
   }
   
   const handleResetTrim = () => {
-    if (!selectedClip) return
+    console.log('[ExportControls] handleResetTrim called:', { selectedClip, selectedClipId })
+    
+    if (!selectedClip) {
+      console.warn('[ExportControls] No selected clip for Reset Trim')
+      showToast('No clip selected', 'error')
+      return
+    }
     
     updateClipTrim(selectedClip.id, 0, selectedClip.duration)
     showToast('Trim reset to full clip', 'success')
